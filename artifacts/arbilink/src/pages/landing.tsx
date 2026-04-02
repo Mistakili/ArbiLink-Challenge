@@ -124,12 +124,12 @@ const STEPS = [
   {
     number: "02",
     title: "Ask in plain English",
-    description: "\"What's the gas price?\" \"Check 0x... balance.\" \"What DeFi protocols are on Arbitrum?\" No special syntax.",
+    description: "\"Simulate a 10x ETH long on GMX.\" \"Prepare a swap of 1 ETH to USDC.\" \"What's in this wallet?\" No special syntax.",
   },
   {
     number: "03",
-    title: "Get live blockchain data",
-    description: "ArbiLink queries Arbitrum's RPC nodes and returns structured data directly inside your AI conversation.",
+    title: "See the chain. Act on it.",
+    description: "ArbiLink returns live data, full risk breakdowns, and ready-to-sign calldata — all inside your AI conversation.",
   },
 ];
 
@@ -203,13 +203,13 @@ export default function Landing() {
               blockchain&#8209;blind
             </span>
             .<br />
-            <span className="text-primary">ArbiLink</span> gives it eyes.
+            <span className="text-primary">ArbiLink</span> gives it eyes <span className="text-muted-foreground/80">&amp;</span> hands.
           </h1>
 
           <p className="text-muted-foreground text-lg sm:text-xl max-w-xl leading-relaxed">
             A native MCP server that connects Claude, Cursor, and any AI agent
-            directly to live Arbitrum — balances, tokens, transactions, DeFi
-            protocols, and on-chain agent identity.
+            to live Arbitrum — read chain data, simulate GMX positions,
+            and prepare DeFi transactions before anything is signed.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -255,7 +255,7 @@ export default function Landing() {
               <p className="text-muted-foreground leading-relaxed">
                 Paste this into your{" "}
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">claude_desktop_config.json</code>{" "}
-                and restart Claude Desktop. All 7 tools are instantly available to your agent.
+                and restart Claude Desktop. All 11 tools are instantly available to your agent.
               </p>
             </div>
 
@@ -318,13 +318,13 @@ export default function Landing() {
             <div className="relative mt-6 rounded-xl overflow-hidden border border-primary/20 shadow-[0_0_40px_rgba(40,160,240,0.12)]">
               <img
                 src="/agent-eye.png"
-                alt="AI agent vision — blockchain awareness"
+                alt="AI agent with live blockchain vision and DeFi execution"
                 className="w-full aspect-square object-cover object-center"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
               <div className="absolute bottom-4 left-4 right-4">
                 <p className="text-xs font-mono text-primary/80">
-                  // agent sees the chain. you see the results.
+                  // agent sees the chain. agent acts on it. you see the results.
                 </p>
               </div>
             </div>
@@ -423,10 +423,10 @@ export default function Landing() {
         <div className="relative container max-w-screen-xl px-4 sm:px-8 py-20 flex flex-col sm:flex-row items-center justify-between gap-8">
           <div className="space-y-2 text-center sm:text-left">
             <h2 className="text-2xl font-bold tracking-tight">
-              Give your agent eyes on Arbitrum.
+              Give your agent eyes <span className="text-muted-foreground/60">&amp;</span> hands on Arbitrum.
             </h2>
             <p className="text-muted-foreground">
-              Live. Free. No API key required to start.
+              11 live tools. Free to start. No API key required.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
