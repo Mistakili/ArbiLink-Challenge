@@ -2,8 +2,51 @@ import { useGetNetworkStatus, useGetOverviewStats, useGetTopTokens } from "@work
 import { Activity, Blocks, Cpu, Database, Server, Zap, Terminal, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+
+interface ActivityEntry {
+  id: number;
+  timestamp: string;
+  tool: string;
+  status: "success" | "error";
+  durationMs: number;
+}
+
+interface ActivityResponse {
+  entries: ActivityEntry[];
+  totalCalls: number;
+}
+
+function useActivity() {
+  return useQuery<ActivityResponse>({
+    queryKey: ["stats", "activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats/activity");
+      if (!res.ok) throw new Error("Failed to fetch activity");
+      return res.json() as Promise<ActivityResponse>;
+    },
+    refetchInterval: 3000,
+  });
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toISOString().split("T")[1].slice(0, 8);
+}
+
+function formatTool(tool: string) {
+  switch (tool) {
+    case "get_network_status": return "Fetched Arbitrum network status";
+    case "get_wallet_balance": return "Queried wallet balance";
+    case "get_transaction": return "Looked up transaction";
+    case "get_top_tokens": return "Fetched top token prices";
+    case "get_protocols": return "Listed ecosystem protocols";
+    case "get_agent_status": return "Checked agent registration";
+    case "get_overview_stats": return "Fetched overview statistics";
+    case "register_agent": return "Registered agent on-chain";
+    default: return `Executed tool '${tool}'`;
+  }
+}
 
 export default function Home() {
   const { data: network, isLoading: isLoadingNetwork } = useGetNetworkStatus({
@@ -18,28 +61,7 @@ export default function Home() {
     query: { refetchInterval: 30000 }
   });
 
-  const [recentLogs, setRecentLogs] = useState<{ id: number, time: Date, message: string, status: 'success' | 'pending' | 'error' }[]>([
-    { id: 1, time: new Date(), message: "Initialized MCP Server connection", status: "success" },
-    { id: 2, time: new Date(Date.now() - 2000), message: "Agent synced with Arbitrum One", status: "success" },
-    { id: 3, time: new Date(Date.now() - 5000), message: "Waiting for tool execution requests...", status: "pending" },
-  ]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (Math.random() > 0.7) {
-        setRecentLogs(prev => [
-          {
-            id: Date.now(),
-            time: new Date(),
-            message: `Executed tool 'get_balance' for 0x${Math.random().toString(16).slice(2, 10)}...`,
-            status: "success"
-          },
-          ...prev.slice(0, 9)
-        ]);
-      }
-    }, 3000);
-    return () => clearInterval(timer);
-  }, []);
+  const { data: activity } = useActivity();
 
   return (
     <div className="container max-w-screen-2xl p-4 sm:p-8 space-y-8 animate-in fade-in duration-500">
@@ -92,7 +114,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              {isLoadingStats ? <Skeleton className="h-8 w-12" /> : stats?.activeAgents || 142}
+              {isLoadingStats ? <Skeleton className="h-8 w-12" /> : stats?.activeAgents ?? "—"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Registered on identity contract
@@ -107,10 +129,14 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              {isLoadingStats ? <Skeleton className="h-8 w-20" /> : (stats?.totalToolCalls?.toLocaleString() || "1,337")}
+              {activity?.totalCalls !== undefined
+                ? activity.totalCalls.toLocaleString()
+                : isLoadingStats
+                ? <Skeleton className="h-8 w-20" />
+                : (stats?.totalToolCalls?.toLocaleString() ?? "—")}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Across all endpoints
+              This session
             </p>
           </CardContent>
         </Card>
@@ -122,24 +148,36 @@ export default function Home() {
             <CardTitle className="flex items-center gap-2 text-sm font-mono">
               <Terminal className="h-4 w-4" />
               mcp-server-log
+              <span className="ml-auto text-[10px] text-muted-foreground font-normal">live</span>
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 flex-1 min-h-[300px] max-h-[400px] overflow-y-auto bg-[#03060a] font-mono text-xs font-medium">
             <div className="p-4 space-y-2">
-              {recentLogs.map((log) => (
-                <div key={log.id} className="flex gap-4 items-start border-l-2 border-transparent hover:border-primary/50 hover:bg-white/5 p-1 -ml-1 pl-3 transition-colors">
+              {!activity || activity.entries.length === 0 ? (
+                <div className="flex gap-4 items-start p-1">
                   <span className="text-muted-foreground shrink-0">
-                    [{log.time.toISOString().split('T')[1].slice(0, 8)}]
+                    [{new Date().toISOString().split("T")[1].slice(0, 8)}]
                   </span>
-                  <span className={`
-                    ${log.status === 'success' ? 'text-green-400' : ''}
-                    ${log.status === 'pending' ? 'text-yellow-400' : ''}
-                    ${log.status === 'error' ? 'text-red-400' : ''}
-                  `}>
-                    {log.message}
-                  </span>
+                  <span className="text-yellow-400">Waiting for tool execution requests...</span>
                 </div>
-              ))}
+              ) : (
+                activity.entries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex gap-4 items-start border-l-2 border-transparent hover:border-primary/50 hover:bg-white/5 p-1 -ml-1 pl-3 transition-colors"
+                  >
+                    <span className="text-muted-foreground shrink-0">[{formatTime(entry.timestamp)}]</span>
+                    <span className={entry.status === "success" ? "text-green-400" : "text-red-400"}>
+                      {formatTool(entry.tool)}
+                      <span className="text-muted-foreground ml-2">({entry.durationMs}ms)</span>
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -164,7 +202,9 @@ export default function Home() {
                   <div key={token.address} className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-background border border-border/50 flex items-center justify-center overflow-hidden">
-                        {token.logoUrl ? <img src={token.logoUrl} alt={token.symbol} className="w-full h-full object-contain" /> : <div className="text-xs font-bold">{token.symbol[0]}</div>}
+                        {token.logoUrl
+                          ? <img src={token.logoUrl} alt={token.symbol} className="w-full h-full object-contain" />
+                          : <div className="text-xs font-bold">{token.symbol[0]}</div>}
                       </div>
                       <div>
                         <div className="font-bold font-mono text-sm">{token.symbol}</div>
@@ -173,8 +213,8 @@ export default function Home() {
                     </div>
                     <div className="text-right">
                       <div className="font-mono text-sm">{token.price}</div>
-                      <div className={`text-xs ${token.priceChange24h.startsWith('-') ? 'text-destructive' : 'text-green-500'}`}>
-                        {token.priceChange24h.startsWith('-') ? '' : '+'}{token.priceChange24h}
+                      <div className={`text-xs ${token.priceChange24h.startsWith("-") ? "text-destructive" : "text-green-500"}`}>
+                        {token.priceChange24h.startsWith("-") ? "" : "+"}{token.priceChange24h}
                       </div>
                     </div>
                   </div>
@@ -202,7 +242,7 @@ export default function Home() {
                 <span className="text-muted-foreground flex items-center gap-2">
                   <Server className="h-4 w-4" /> API
                 </span>
-                <span className="text-green-500 font-medium font-mono text-xs">99.9%</span>
+                <span className="text-green-500 font-medium font-mono text-xs">{stats?.uptimePercent ?? "99.9"}%</span>
               </div>
             </div>
 

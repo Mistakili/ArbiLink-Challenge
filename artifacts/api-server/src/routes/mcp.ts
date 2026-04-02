@@ -18,7 +18,7 @@ import {
   ARBITRUM_SEPOLIA_EXPLORER,
   agentRegistryAbi,
 } from "../lib/arbitrum.js";
-import { MCP_TOOLS as tools } from "../lib/mcp-tools.js";
+import { activityTracker } from "../lib/activity.js";
 import { isAddress, type Address } from "viem";
 
 const router: IRouter = Router();
@@ -42,12 +42,13 @@ router.post("/mcp/execute", async (req, res) => {
 
   const { tool, arguments: args } = body.data;
   const executedAt = new Date().toISOString();
+  const start = Date.now();
 
-  const knownTool = tools.find((t) => t.name === tool);
+  const knownTool = MCP_TOOLS.find((t) => t.name === tool);
   if (!knownTool) {
     res.status(400).json({
       error: "unknown_tool",
-      message: `Unknown tool: ${tool}. Available tools: ${tools.map((t) => t.name).join(", ")}`,
+      message: `Unknown tool: ${tool}. Available tools: ${MCP_TOOLS.map((t) => t.name).join(", ")}`,
     });
     return;
   }
@@ -126,10 +127,10 @@ router.post("/mcp/execute", async (req, res) => {
         result = {
           network: networkData.network,
           blockNumber: networkData.blockNumber,
-          totalToolCalls: 1247,
+          totalToolCalls: activityTracker.getTotalCalls(),
           activeAgents: 38,
           supportedProtocols: ARBITRUM_PROTOCOLS.length,
-          availableTools: tools.length,
+          availableTools: MCP_TOOLS.length,
           avgGasPrice: networkData.gasPriceGwei + " gwei",
           uptimePercent: "99.9",
         };
@@ -140,6 +141,8 @@ router.post("/mcp/execute", async (req, res) => {
         return;
     }
 
+    activityTracker.record(tool, "success", Date.now() - start);
+
     const response = {
       success: true,
       result: result as Record<string, unknown>,
@@ -149,6 +152,7 @@ router.post("/mcp/execute", async (req, res) => {
     };
     res.json(ExecuteMcpToolResponse.parse(response));
   } catch (err: unknown) {
+    activityTracker.record(tool, "error", Date.now() - start);
     const message = err instanceof Error ? err.message : "Tool execution failed";
     req.log.error({ err, tool }, "MCP tool execution failed");
     const response = {
