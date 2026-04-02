@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "hjrvB0nHuZxKi5YUn_bO_"
+uri = "file://SKILL.md"
+type = "text"
+title = "SKILL.md — ArbiLink MCP Server"
