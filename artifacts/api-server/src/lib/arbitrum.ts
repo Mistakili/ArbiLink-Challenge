@@ -12,9 +12,6 @@ import { arbitrum, arbitrumSepolia } from "viem/chains";
 export const ARBITRUM_ONE_RPC = "https://arb1.arbitrum.io/rpc";
 export const ARBITRUM_SEPOLIA_RPC = "https://sepolia-rollup.arbitrum.io/rpc";
 
-export const AGENT_REGISTRY_MAINNET = "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432";
-export const AGENT_REGISTRY_SEPOLIA = "0x8004A818BFB912233c491871b3d84c89A494BD9e";
-
 export const ARBITRUM_EXPLORER = "https://arbiscan.io";
 export const ARBITRUM_SEPOLIA_EXPLORER = "https://sepolia.arbiscan.io";
 
@@ -30,13 +27,42 @@ export const agentRegistryAbi = [
     outputs: [],
   },
   {
+    name: "updateAgent",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "name", type: "string" },
+      { name: "metadataUri", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
     name: "isRegistered",
     type: "function",
     stateMutability: "view",
     inputs: [{ name: "agent", type: "address" }],
     outputs: [{ name: "", type: "bool" }],
   },
+  {
+    name: "getAgent",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "agent", type: "address" }],
+    outputs: [
+      { name: "name", type: "string" },
+      { name: "metadataUri", type: "string" },
+      { name: "registeredAt", type: "uint256" },
+    ],
+  },
+  {
+    name: "getAgentCount",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
 ] as const;
+
 
 const erc20Abi = [
   {

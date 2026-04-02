@@ -7,12 +7,14 @@ import {
 } from "@workspace/api-zod";
 import {
   getPublicClient,
-  AGENT_REGISTRY_MAINNET,
-  AGENT_REGISTRY_SEPOLIA,
   ARBITRUM_EXPLORER,
   ARBITRUM_SEPOLIA_EXPLORER,
   agentRegistryAbi,
 } from "../lib/arbitrum.js";
+import {
+  deployRegistryIfNeeded,
+  getDeployedRegistryAddress,
+} from "../lib/registry-deploy.js";
 import {
   createWalletClient,
   http,
@@ -37,8 +39,15 @@ router.post("/agent/register", async (req, res) => {
 
   const { name, description, privateKey, network, metadataUri } = body.data;
   const isMainnet = network === "mainnet";
-  const registryAddress = isMainnet ? AGENT_REGISTRY_MAINNET : AGENT_REGISTRY_SEPOLIA;
   const explorerBase = isMainnet ? ARBITRUM_EXPLORER : ARBITRUM_SEPOLIA_EXPLORER;
+
+  if (isMainnet) {
+    res.status(400).json({
+      error: "mainnet_not_supported",
+      message: "Mainnet registration is not yet available. Please use Arbitrum Sepolia.",
+    });
+    return;
+  }
 
   try {
     const account = privateKeyToAccount(
@@ -47,8 +56,8 @@ router.post("/agent/register", async (req, res) => {
 
     const walletClient = createWalletClient({
       account,
-      chain: isMainnet ? arbitrum : arbitrumSepolia,
-      transport: http(isMainnet ? ARBITRUM_ONE_RPC : ARBITRUM_SEPOLIA_RPC),
+      chain: arbitrumSepolia,
+      transport: http(ARBITRUM_SEPOLIA_RPC),
     });
 
     const metadata = JSON.stringify({
@@ -65,10 +74,39 @@ router.post("/agent/register", async (req, res) => {
 
     const metaUri = metadataUri ?? `data:application/json;base64,${Buffer.from(metadata).toString("base64")}`;
 
+    let registryAddress: Address;
+    let deployTx: string | undefined;
+
+    const existing = getDeployedRegistryAddress("sepolia");
+    if (!existing) {
+      req.log.info("No registry deployed yet — deploying ArbiLink Agent Registry to Sepolia");
+      registryAddress = await deployRegistryIfNeeded(walletClient, "sepolia");
+      deployTx = undefined;
+      req.log.info({ registryAddress }, "Registry deployed");
+    } else {
+      registryAddress = existing as Address;
+    }
+
+    const publicClient = getPublicClient("sepolia");
+
+    let alreadyRegistered = false;
+    try {
+      alreadyRegistered = await publicClient.readContract({
+        address: registryAddress,
+        abi: agentRegistryAbi,
+        functionName: "isRegistered",
+        args: [account.address],
+      });
+    } catch {
+      alreadyRegistered = false;
+    }
+
+    const functionName = alreadyRegistered ? "updateAgent" : "registerAgent";
+
     const hash = await walletClient.writeContract({
-      address: registryAddress as Address,
+      address: registryAddress,
       abi: agentRegistryAbi,
-      functionName: "registerAgent",
+      functionName,
       args: [name, metaUri],
     });
 
@@ -77,9 +115,11 @@ router.post("/agent/register", async (req, res) => {
       transactionHash: hash,
       agentAddress: account.address,
       registryAddress,
-      network: isMainnet ? "Arbitrum One" : "Arbitrum Sepolia",
+      network: "Arbitrum Sepolia",
       explorerUrl: `${explorerBase}/tx/${hash}`,
-      message: `Agent "${name}" successfully registered on ${isMainnet ? "Arbitrum One" : "Arbitrum Sepolia"}`,
+      message: alreadyRegistered
+        ? `Agent "${name}" updated on Arbitrum Sepolia (registry: ${registryAddress})`
+        : `Agent "${name}" registered on Arbitrum Sepolia (registry: ${registryAddress})`,
     };
 
     res.json(RegisterAgentResponse.parse(data));
@@ -103,11 +143,23 @@ router.get("/agent/status/:address", async (req, res) => {
     return;
   }
 
-  const registryAddress = AGENT_REGISTRY_MAINNET;
-  const explorerBase = ARBITRUM_EXPLORER;
+  const registryAddress = getDeployedRegistryAddress("sepolia");
+  const explorerBase = ARBITRUM_SEPOLIA_EXPLORER;
+
+  if (!registryAddress) {
+    res.json(GetAgentStatusResponse.parse({
+      address,
+      isRegistered: false,
+      registryAddress: null,
+      network: "Arbitrum Sepolia",
+      registrationBlock: null,
+      explorerUrl: `${explorerBase}/address/${address}`,
+    }));
+    return;
+  }
 
   try {
-    const client = getPublicClient("mainnet");
+    const client = getPublicClient("sepolia");
     let isRegistered = false;
     try {
       isRegistered = await client.readContract({
@@ -124,7 +176,7 @@ router.get("/agent/status/:address", async (req, res) => {
       address,
       isRegistered,
       registryAddress,
-      network: "Arbitrum One",
+      network: "Arbitrum Sepolia",
       registrationBlock: null,
       explorerUrl: `${explorerBase}/address/${address}`,
     };

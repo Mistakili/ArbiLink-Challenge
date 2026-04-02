@@ -12,12 +12,11 @@ import {
   fetchTopTokens,
   ARBITRUM_PROTOCOLS,
   getPublicClient,
-  AGENT_REGISTRY_MAINNET,
-  AGENT_REGISTRY_SEPOLIA,
   ARBITRUM_EXPLORER,
   ARBITRUM_SEPOLIA_EXPLORER,
   agentRegistryAbi,
 } from "../lib/arbitrum.js";
+import { getDeployedRegistryAddress } from "../lib/registry-deploy.js";
 import { activityTracker } from "../lib/activity.js";
 import { isAddress, type Address } from "viem";
 
@@ -99,25 +98,27 @@ router.post("/mcp/execute", async (req, res) => {
           res.status(400).json({ error: "missing_arg", message: "valid address is required" });
           return;
         }
-        const registryAddress = network === "mainnet" ? AGENT_REGISTRY_MAINNET : AGENT_REGISTRY_SEPOLIA;
-        const explorerBase = network === "mainnet" ? ARBITRUM_EXPLORER : ARBITRUM_SEPOLIA_EXPLORER;
-        const client = getPublicClient(network);
+        const registryAddress = getDeployedRegistryAddress("sepolia");
+        const explorerBase = ARBITRUM_SEPOLIA_EXPLORER;
+        const client = getPublicClient("sepolia");
         let isRegistered = false;
-        try {
-          isRegistered = await client.readContract({
-            address: registryAddress as Address,
-            abi: agentRegistryAbi,
-            functionName: "isRegistered",
-            args: [address as Address],
-          });
-        } catch {
-          isRegistered = false;
+        if (registryAddress) {
+          try {
+            isRegistered = await client.readContract({
+              address: registryAddress as Address,
+              abi: agentRegistryAbi,
+              functionName: "isRegistered",
+              args: [address as Address],
+            });
+          } catch {
+            isRegistered = false;
+          }
         }
         result = {
           address,
           isRegistered,
-          registryAddress,
-          network: network === "mainnet" ? "Arbitrum One" : "Arbitrum Sepolia",
+          registryAddress: registryAddress ?? null,
+          network: "Arbitrum Sepolia",
           explorerUrl: `${explorerBase}/address/${address}`,
         };
         break;
