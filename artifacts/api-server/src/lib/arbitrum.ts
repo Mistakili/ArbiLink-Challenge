@@ -963,3 +963,301 @@ export async function fetchTopTokens() {
     updatedAt: new Date().toISOString(),
   };
 }
+
+// ─── Aave V3 ──────────────────────────────────────────────────────────────────
+
+const AAVE_V3_POOL = "0x794a61358D6845594F94dc1DB02A252b5b4814aD" as const;
+
+const AAVE_POOL_ABI = [
+  {
+    name: "getUserAccountData",
+    type: "function",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      { name: "totalCollateralBase", type: "uint256" },
+      { name: "totalDebtBase", type: "uint256" },
+      { name: "availableBorrowsBase", type: "uint256" },
+      { name: "currentLiquidationThreshold", type: "uint256" },
+      { name: "ltv", type: "uint256" },
+      { name: "healthFactor", type: "uint256" },
+    ],
+  },
+] as const;
+
+export async function fetchAavePositions(address: string) {
+  if (!isAddress(address)) throw new Error("Invalid Ethereum address");
+
+  const client = getPublicClient("mainnet");
+
+  let accountData: readonly [bigint, bigint, bigint, bigint, bigint, bigint];
+  try {
+    accountData = await client.readContract({
+      address: AAVE_V3_POOL as Address,
+      abi: AAVE_POOL_ABI,
+      functionName: "getUserAccountData",
+      args: [address as Address],
+    });
+  } catch (e) {
+    throw new Error("Failed to read Aave V3 Pool: " + String(e));
+  }
+
+  const [totalCollateralBase, totalDebtBase, availableBorrowsBase, currentLiquidationThreshold, ltv, healthFactor] = accountData;
+
+  const totalCollateralUsd = Number(totalCollateralBase) / 1e8;
+  const totalDebtUsd       = Number(totalDebtBase)       / 1e8;
+  const availableBorrows   = Number(availableBorrowsBase) / 1e8;
+  const liqThresholdPct    = Number(currentLiquidationThreshold) / 100;
+  const ltvPct             = Number(ltv) / 100;
+  const hf                 = Number(healthFactor) / 1e18;
+
+  if (totalCollateralUsd === 0 && totalDebtUsd === 0) {
+    return {
+      address,
+      network: "Arbitrum One — Aave V3",
+      hasPositions: false,
+      note: `No active Aave V3 positions for ${address}.`,
+      aaveApp: `https://app.aave.com/?marketName=proto_arbitrum_v3`,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  const healthStatus =
+    totalDebtUsd === 0             ? "✅ NO DEBT"        :
+    hf < 1.0                       ? "🚨 LIQUIDATABLE"   :
+    hf < 1.05                      ? "🚨 CRITICAL"       :
+    hf < 1.15                      ? "⚠️ AT RISK"        :
+    hf < 1.5                       ? "⚡ MONITOR"        :
+                                     "✅ HEALTHY";
+
+  const fmt = (v: number) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+
+  return {
+    address,
+    network: "Arbitrum One — Aave V3",
+    hasPositions: true,
+    summary: {
+      healthFactor:            totalDebtUsd > 0 ? hf.toFixed(4) : "∞",
+      healthStatus,
+      totalCollateral:         fmt(totalCollateralUsd),
+      totalDebt:               fmt(totalDebtUsd),
+      netPosition:             fmt(totalCollateralUsd - totalDebtUsd),
+      availableToBorrow:       fmt(availableBorrows),
+      loanToValue:             `${ltvPct.toFixed(1)}%`,
+      liquidationThreshold:    `${liqThresholdPct.toFixed(1)}%`,
+    },
+    note: totalDebtUsd > 0
+      ? hf < 1.15
+        ? "⚠️ Health factor is low — consider adding collateral or repaying debt."
+        : "Health factor looks safe. Monitor if markets move significantly."
+      : "Supply-only position — no liquidation risk.",
+    aaveApp:  `https://app.aave.com/?marketName=proto_arbitrum_v3`,
+    arbiscan: `https://arbiscan.io/address/${address}`,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+// ─── Uniswap V3 LP ────────────────────────────────────────────────────────────
+
+const NONFUNGIBLE_POSITION_MANAGER = "0xC36442b4a4522E871399CD717aBDD847Ab11FE88" as const;
+const UNISWAP_V3_FACTORY           = "0x1F98431c8aD98523631AE4a59f267346ea31F984" as const;
+
+const POSITION_MANAGER_ABI = [
+  { name: "balanceOf", type: "function", stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ type: "uint256" }] },
+  { name: "tokenOfOwnerByIndex", type: "function", stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }, { name: "index", type: "uint256" }],
+    outputs: [{ type: "uint256" }] },
+  { name: "positions", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [
+      { name: "nonce",                       type: "uint96"   },
+      { name: "operator",                    type: "address"  },
+      { name: "token0",                      type: "address"  },
+      { name: "token1",                      type: "address"  },
+      { name: "fee",                         type: "uint24"   },
+      { name: "tickLower",                   type: "int24"    },
+      { name: "tickUpper",                   type: "int24"    },
+      { name: "liquidity",                   type: "uint128"  },
+      { name: "feeGrowthInside0LastX128",    type: "uint256"  },
+      { name: "feeGrowthInside1LastX128",    type: "uint256"  },
+      { name: "tokensOwed0",                 type: "uint128"  },
+      { name: "tokensOwed1",                 type: "uint128"  },
+    ] },
+] as const;
+
+const FACTORY_ABI_LP = [
+  { name: "getPool", type: "function", stateMutability: "view",
+    inputs: [{ name: "tokenA", type: "address" }, { name: "tokenB", type: "address" }, { name: "fee", type: "uint24" }],
+    outputs: [{ type: "address" }] },
+] as const;
+
+const POOL_SLOT0_ABI_LP = [
+  { name: "slot0", type: "function", stateMutability: "view", inputs: [],
+    outputs: [
+      { name: "sqrtPriceX96",               type: "uint160" },
+      { name: "tick",                        type: "int24"   },
+      { name: "observationIndex",            type: "uint16"  },
+      { name: "observationCardinality",      type: "uint16"  },
+      { name: "observationCardinalityNext",  type: "uint16"  },
+      { name: "feeProtocol",                 type: "uint8"   },
+      { name: "unlocked",                    type: "bool"    },
+    ] },
+] as const;
+
+const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number }> = {
+  "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": { symbol: "WETH",   decimals: 18 },
+  "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": { symbol: "USDC.e", decimals: 6  },
+  "0xaf88d065e77c8cc2239327c5edb3a432268e5831": { symbol: "USDC",   decimals: 6  },
+  "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": { symbol: "USDT",   decimals: 6  },
+  "0x2f2a2543b76a4166549f7aab2e75bef0aefc5b0f": { symbol: "WBTC",   decimals: 8  },
+  "0x912ce59144191c1204e64559fe8253a0e49e6548": { symbol: "ARB",    decimals: 18 },
+  "0xfc5a1a6eb076a2c7ad06ed22c90d7e710e35ad0a": { symbol: "GMX",    decimals: 18 },
+  "0xf97f4df75117a78c1a5a0dbb814af92458539fb4": { symbol: "LINK",   decimals: 18 },
+  "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1": { symbol: "DAI",    decimals: 18 },
+  "0x0c4681e6c0235179ec3d4f4fc4df3d14fdd96017": { symbol: "RDNT",   decimals: 18 },
+  "0x0d2425d39af5c4b8285ed0ad26fb8acf762d6e60": { symbol: "PENDLE", decimals: 18 },
+};
+
+function resolveToken(addr: string) {
+  return KNOWN_TOKENS[addr.toLowerCase()] ?? { symbol: addr.slice(0, 6) + "…", decimals: 18 };
+}
+
+export async function fetchUniswapLpPositions(address: string) {
+  if (!isAddress(address)) throw new Error("Invalid Ethereum address");
+
+  const client = getPublicClient("mainnet");
+  const addr = address as Address;
+
+  let balance: bigint;
+  try {
+    balance = await client.readContract({
+      address: NONFUNGIBLE_POSITION_MANAGER as Address,
+      abi: POSITION_MANAGER_ABI,
+      functionName: "balanceOf",
+      args: [addr],
+    });
+  } catch {
+    throw new Error("Failed to connect to Uniswap V3 Position Manager");
+  }
+
+  if (balance === 0n) {
+    return {
+      address,
+      network: "Arbitrum One — Uniswap V3",
+      openPositions: 0,
+      totalPositions: 0,
+      positions: [],
+      note: `No Uniswap V3 LP positions found for ${address}.`,
+      uniswapApp: `https://app.uniswap.org/positions?chain=arbitrum`,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  const MAX = 12;
+  const count = Math.min(Number(balance), MAX);
+
+  // Fetch all token IDs in parallel
+  const tokenIds = (await Promise.all(
+    Array.from({ length: count }, (_, i) =>
+      client.readContract({
+        address: NONFUNGIBLE_POSITION_MANAGER as Address,
+        abi: POSITION_MANAGER_ABI,
+        functionName: "tokenOfOwnerByIndex",
+        args: [addr, BigInt(i)],
+      }).catch(() => null)
+    )
+  )).filter((id): id is bigint => id !== null);
+
+  // Fetch all position data in parallel
+  type RawPos = readonly [bigint, string, string, string, number, number, number, bigint, bigint, bigint, bigint, bigint];
+  const rawPositions = (await Promise.all(
+    tokenIds.map(tokenId =>
+      client.readContract({
+        address: NONFUNGIBLE_POSITION_MANAGER as Address,
+        abi: POSITION_MANAGER_ABI,
+        functionName: "positions",
+        args: [tokenId],
+      }).then(pos => ({ tokenId, pos: pos as RawPos })).catch(() => null)
+    )
+  )).filter(Boolean) as { tokenId: bigint; pos: RawPos }[];
+
+  // Get unique pool keys and fetch pool addresses in parallel
+  const uniqueKeys = [...new Set(rawPositions.map(({ pos }) => `${pos[2]}|${pos[3]}|${pos[4]}`))];
+  const poolAddressMap = new Map<string, Address>();
+  await Promise.all(
+    uniqueKeys.map(async (key) => {
+      const [t0, t1, fee] = key.split("|") as [string, string, string];
+      const pool = await client.readContract({
+        address: UNISWAP_V3_FACTORY as Address,
+        abi: FACTORY_ABI_LP,
+        functionName: "getPool",
+        args: [t0 as Address, t1 as Address, Number(fee) as 100 | 500 | 3000 | 10000],
+      }).catch(() => null);
+      if (pool && pool !== "0x0000000000000000000000000000000000000000") {
+        poolAddressMap.set(key, pool as Address);
+      }
+    })
+  );
+
+  // Fetch current ticks for all pools in parallel
+  const currentTickMap = new Map<string, number>();
+  await Promise.all(
+    [...poolAddressMap.entries()].map(async ([key, poolAddr]) => {
+      const slot0 = await client.readContract({
+        address: poolAddr,
+        abi: POOL_SLOT0_ABI_LP,
+        functionName: "slot0",
+      }).catch(() => null);
+      if (slot0) currentTickMap.set(key, slot0[1]);
+    })
+  );
+
+  // Build result objects
+  const positions = rawPositions.map(({ tokenId, pos }) => {
+    const [, , token0Addr, token1Addr, fee, tickLower, tickUpper, liquidity, , , tokensOwed0, tokensOwed1] = pos;
+    const t0 = resolveToken(token0Addr);
+    const t1 = resolveToken(token1Addr);
+    const poolKey = `${token0Addr}|${token1Addr}|${fee}`;
+    const tick = currentTickMap.get(poolKey);
+    const inRange = tick !== undefined
+      ? tick >= tickLower && tick <= tickUpper
+      : null;
+
+    const fee0 = Number(tokensOwed0) / 10 ** t0.decimals;
+    const fee1 = Number(tokensOwed1) / 10 ** t1.decimals;
+
+    return {
+      tokenId:         tokenId.toString(),
+      pair:            `${t0.symbol}/${t1.symbol}`,
+      feeTier:         `${fee / 10000}%`,
+      status:          liquidity > 0n
+                         ? inRange === null  ? "ACTIVE (range unknown)"
+                         : inRange           ? "✅ IN RANGE"
+                                             : "⛔ OUT OF RANGE"
+                         : "CLOSED (no liquidity)",
+      tickRange:       `${tickLower} → ${tickUpper}`,
+      uncollectedFees: {
+        [t0.symbol]: fee0.toFixed(6),
+        [t1.symbol]: fee1.toFixed(6),
+      },
+      positionUrl:     `https://app.uniswap.org/positions/v3/arbitrum/${tokenId}`,
+    };
+  });
+
+  const inRangeCount = positions.filter(p => p.status.includes("IN RANGE")).length;
+
+  return {
+    address,
+    network: "Arbitrum One — Uniswap V3",
+    openPositions: positions.filter(p => !p.status.startsWith("CLOSED")).length,
+    inRangePositions: inRangeCount,
+    totalNfts: Number(balance),
+    positions,
+    note: Number(balance) > MAX ? `Showing first ${MAX} of ${balance} positions.` : undefined,
+    uniswapApp:  `https://app.uniswap.org/positions?chain=arbitrum`,
+    arbiscan:    `https://arbiscan.io/address/${address}`,
+    fetchedAt:   new Date().toISOString(),
+  };
+}

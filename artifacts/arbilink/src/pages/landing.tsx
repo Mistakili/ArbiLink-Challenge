@@ -113,6 +113,22 @@ const TOOLS = [
     color: "text-orange-400",
     highlight: false,
   },
+  {
+    icon: Activity,
+    name: "get_aave_positions",
+    label: "Aave V3 Positions",
+    description: "Full Aave V3 lending and borrowing snapshot for any wallet — health factor, total collateral, total debt, net position, available to borrow, LTV, and liquidation threshold. Instant liquidation risk assessment.",
+    color: "text-purple-400",
+    highlight: false,
+  },
+  {
+    icon: ArrowLeftRight,
+    name: "get_uniswap_lp_positions",
+    label: "Uniswap V3 LP Positions",
+    description: "All Uniswap V3 NFT LP positions for any wallet — pair, fee tier, in-range / out-of-range status, uncollected fees per token, and a direct link to manage each position on the Uniswap app.",
+    color: "text-pink-400",
+    highlight: false,
+  },
 ];
 
 const STEPS = [
@@ -255,7 +271,7 @@ export default function Landing() {
               <p className="text-muted-foreground leading-relaxed">
                 Paste this into your{" "}
                 <code className="text-xs bg-muted px-1 py-0.5 rounded">claude_desktop_config.json</code>{" "}
-                and restart Claude Desktop. All 11 tools are instantly available to your agent.
+                and restart Claude Desktop. All 13 tools are instantly available to your agent.
               </p>
             </div>
 
@@ -337,9 +353,9 @@ export default function Landing() {
         <div className="container max-w-screen-xl px-4 sm:px-8 py-24 space-y-12">
           <div className="space-y-2 text-center">
             <p className="text-xs font-mono text-primary uppercase tracking-widest">Tools</p>
-            <h2 className="text-3xl font-bold tracking-tight">11 live tools — read and <span className="text-primary">execute</span></h2>
+            <h2 className="text-3xl font-bold tracking-tight">13 live tools — read and <span className="text-primary">execute</span></h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              8 read tools for live blockchain data + 3 execution tools that let agents
+              10 read tools for live blockchain data + 3 execution tools that let agents
               simulate and prepare real DeFi transactions before anything is signed.
             </p>
           </div>
@@ -426,7 +442,7 @@ export default function Landing() {
               Give your agent eyes <span className="text-muted-foreground/60">&amp;</span> hands on Arbitrum.
             </h2>
             <p className="text-muted-foreground">
-              11 live tools. Free to start. No API key required.
+              13 live tools. Free to start. No API key required.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

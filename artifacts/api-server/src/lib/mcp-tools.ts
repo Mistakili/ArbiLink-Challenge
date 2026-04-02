@@ -195,4 +195,34 @@ export const MCP_TOOLS = [
       required: ["address"],
     },
   },
+  {
+    name: "get_aave_positions",
+    description:
+      "Get live Aave V3 lending and borrowing positions for any wallet on Arbitrum One. Returns: health factor with status (HEALTHY / AT RISK / CRITICAL / LIQUIDATABLE), total collateral in USD, total debt in USD, net position, available to borrow, loan-to-value ratio, and liquidation threshold. Use this when someone asks 'check the Aave health factor for 0x...', 'is this wallet at risk of liquidation on Aave?', 'how much has this address borrowed on Aave?', or 'show Aave positions for this wallet'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: {
+          type: "string",
+          description: "Ethereum wallet address to check Aave V3 positions for (starting with 0x)",
+        },
+      },
+      required: ["address"],
+    },
+  },
+  {
+    name: "get_uniswap_lp_positions",
+    description:
+      "Get Uniswap V3 liquidity provider (LP) positions for any wallet on Arbitrum One. Returns all NFT LP positions including: token pair, fee tier, in-range status (✅ IN RANGE / ⛔ OUT OF RANGE), accumulated uncollected fees for each token, tick range, and a direct link to manage the position on the Uniswap app. Use this when someone asks 'show me Uniswap LP positions for 0x...', 'is this LP position in range?', 'how much in uncollected fees does this wallet have?', or 'check liquidity positions for this address'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: {
+          type: "string",
+          description: "Ethereum wallet address to check Uniswap V3 LP positions for (starting with 0x)",
+        },
+      },
+      required: ["address"],
+    },
+  },
 ];

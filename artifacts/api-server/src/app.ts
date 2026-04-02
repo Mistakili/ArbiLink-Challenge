@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import mcpNativeRouter from "./routes/mcp-native.js";
 import { logger } from "./lib/logger";
+import { rateLimitMiddleware } from "./lib/rate-limit.js";
 
 const app: Express = express();
 
@@ -34,7 +35,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/mcp", mcpNativeRouter);
-app.use("/api", router);
+app.use("/mcp", rateLimitMiddleware, mcpNativeRouter);
+app.use("/api", rateLimitMiddleware, router);
 
 export default app;

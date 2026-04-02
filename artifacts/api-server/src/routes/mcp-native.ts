@@ -9,6 +9,8 @@ import {
   simulateGmxOpen,
   prepareUniswapSwap,
   fetchGmxPositionHealth,
+  fetchAavePositions,
+  fetchUniswapLpPositions,
   ARBITRUM_PROTOCOLS,
   getPublicClient,
   ARBITRUM_SEPOLIA_EXPLORER,
@@ -174,6 +176,22 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           return textContent("Error: address is required (0x...)", true);
         }
         result = await fetchGmxPositionHealth(address);
+        break;
+      }
+      case "get_aave_positions": {
+        const address = args["address"];
+        if (typeof address !== "string") {
+          return textContent("Error: address is required (0x...)", true);
+        }
+        result = await fetchAavePositions(address);
+        break;
+      }
+      case "get_uniswap_lp_positions": {
+        const address = args["address"];
+        if (typeof address !== "string") {
+          return textContent("Error: address is required (0x...)", true);
+        }
+        result = await fetchUniswapLpPositions(address);
         break;
       }
       default:
