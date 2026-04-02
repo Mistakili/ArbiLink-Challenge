@@ -1,0 +1,22 @@
+{
+  "name": "ArbiLink",
+  "description": "Native MCP server connecting AI agents to Arbitrum — live balances, DeFi positions, GMX perpetual simulation, Uniswap V3 swap preparation, and on-chain agent identity via AgentRegistry contract.",
+  "url": "https://arbi-link-challenge.replit.app/mcp",
+  "transport": "http",
+  "categories": ["blockchain", "defi", "finance", "web3"],
+  "supportedClients": ["claude-desktop", "cursor", "windsurf", "cline"],
+  "tools": [
+    "get_network_status",
+    "get_eth_balance",
+    "get_token_balance",
+    "get_wallet_portfolio",
+    "get_transaction",
+    "get_gas_price",
+    "get_block",
+    "get_contract_abi",
+    "get_defi_rates",
+    "simulate_gmx_open",
+    "prepare_uniswap_swap",
+    "get_gmx_position_health"
+  ]
+}
