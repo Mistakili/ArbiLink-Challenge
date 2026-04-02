@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import mcpNativeRouter from "./routes/mcp-native.js";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -25,10 +26,15 @@ app.use(
     },
   }),
 );
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Mcp-Session-Id"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/mcp", mcpNativeRouter);
 app.use("/api", router);
 
 export default app;

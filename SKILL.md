@@ -13,8 +13,8 @@ ArbiLink is an HTTP server that gives AI agents native access to the Arbitrum bl
 ## Live Deployment
 
 - **Dashboard**: https://arbi-link-challenge.replit.app
-- **MCP endpoint**: https://arbi-link-challenge.replit.app/api/mcp
-- **Tools list**: https://arbi-link-challenge.replit.app/api/mcp/tools
+- **Native MCP endpoint**: https://arbi-link-challenge.replit.app/mcp *(JSON-RPC 2.0, protocol version 2024-11-05)*
+- **OpenAI-compat tools list**: https://arbi-link-challenge.replit.app/api/mcp/tools
 
 ## Quick Start — Claude Desktop
 
@@ -25,7 +25,7 @@ Add this to your `claude_desktop_config.json`:
   "mcpServers": {
     "arbilink": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://arbi-link-challenge.replit.app/api/mcp"]
+      "args": ["-y", "mcp-remote", "https://arbi-link-challenge.replit.app/mcp"]
     }
   }
 }
