@@ -14,6 +14,9 @@ import {
   Copy,
   Check,
   ExternalLink,
+  Flame,
+  ArrowLeftRight,
+  Activity,
 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -82,6 +85,32 @@ const TOOLS = [
     label: "Overview Stats",
     description: "Aggregate metrics: total tool calls, active agents, supported protocols.",
     color: "text-pink-400",
+    highlight: false,
+  },
+  {
+    icon: Flame,
+    name: "simulate_gmx_open",
+    label: "GMX Position Simulator",
+    description: "Simulate a GMX V2 perpetual before touching real funds — entry price, liquidation price, PnL scenarios for ±5/10/20%, hourly borrow fee, and full risk breakdown. Supports ETH, BTC, ARB, LINK with up to 100x leverage.",
+    color: "text-red-400",
+    highlight: true,
+    highlightColor: "red",
+  },
+  {
+    icon: ArrowLeftRight,
+    name: "prepare_uniswap_swap",
+    label: "Uniswap Swap Prep",
+    description: "Quote and prepare any Uniswap V3 token swap on Arbitrum — exchange rate, price impact, minimum output, and ready-to-sign calldata for SwapRouter02. No transaction sent until you approve.",
+    color: "text-blue-400",
+    highlight: true,
+    highlightColor: "blue",
+  },
+  {
+    icon: Activity,
+    name: "get_gmx_position_health",
+    label: "GMX Position Health",
+    description: "Live health check for any wallet's open GMX V2 perp positions — leverage, size, collateral, liquidation price, unrealized PnL, and a HEALTHY / AT RISK / CRITICAL status flag.",
+    color: "text-orange-400",
     highlight: false,
   },
 ];
@@ -308,39 +337,51 @@ export default function Landing() {
         <div className="container max-w-screen-xl px-4 sm:px-8 py-24 space-y-12">
           <div className="space-y-2 text-center">
             <p className="text-xs font-mono text-primary uppercase tracking-widest">Tools</p>
-            <h2 className="text-3xl font-bold tracking-tight">8 live tools, ready now</h2>
+            <h2 className="text-3xl font-bold tracking-tight">11 live tools — read and <span className="text-primary">execute</span></h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Every tool is callable from any MCP host or OpenAI-compatible agent framework.
-              All data is fetched live from Arbitrum nodes — no cache, no stale data.
+              8 read tools for live blockchain data + 3 execution tools that let agents
+              simulate and prepare real DeFi transactions before anything is signed.
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {TOOLS.map((tool) => {
               const Icon = tool.icon;
+              const hc = (tool as any).highlightColor as string | undefined;
               if (tool.highlight) {
+                const styles = {
+                  cyan: { card: "bg-cyan-950/30 border-cyan-500/30 hover:border-cyan-400/50 hover:bg-cyan-950/50 shadow-[0_0_30px_rgba(34,211,238,0.07)]", badge: "border-cyan-500/40 text-cyan-400", prompt: "text-cyan-400/70" },
+                  red:  { card: "bg-red-950/30 border-red-500/30 hover:border-red-400/50 hover:bg-red-950/50 shadow-[0_0_30px_rgba(239,68,68,0.07)]", badge: "border-red-500/40 text-red-400", prompt: "text-red-400/70" },
+                  blue: { card: "bg-blue-950/30 border-blue-500/30 hover:border-blue-400/50 hover:bg-blue-950/50 shadow-[0_0_30px_rgba(59,130,246,0.07)]", badge: "border-blue-500/40 text-blue-400", prompt: "text-blue-400/70" },
+                }[hc ?? "cyan"] ?? { card: "bg-cyan-950/30 border-cyan-500/30", badge: "border-cyan-500/40 text-cyan-400", prompt: "text-cyan-400/70" };
+
+                const examplePrompts: Record<string, string> = {
+                  get_wallet_portfolio: '"What\'s in vitalik\'s Arbitrum wallet?" → works instantly',
+                  simulate_gmx_open:   '"Simulate a 10x ETH long with $500 collateral on GMX"',
+                  prepare_uniswap_swap:'"Prepare a swap of 1 ETH to USDC on Uniswap V3"',
+                };
+
                 return (
-                  <Card
-                    key={tool.name}
-                    className="sm:col-span-2 bg-cyan-950/30 border-cyan-500/30 hover:border-cyan-400/50 hover:bg-cyan-950/50 transition-all shadow-[0_0_30px_rgba(34,211,238,0.07)]"
-                  >
+                  <Card key={tool.name} className={`sm:col-span-2 transition-all ${styles.card}`}>
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-sm">
                           <Icon className={`h-4 w-4 ${tool.color}`} />
                           {tool.label}
                         </CardTitle>
-                        <Badge variant="outline" className="text-[9px] font-mono border-cyan-500/40 text-cyan-400 px-1.5">
-                          NEW
+                        <Badge variant="outline" className={`text-[9px] font-mono px-1.5 ${styles.badge}`}>
+                          {hc === "cyan" ? "NEW" : "EXEC"}
                         </Badge>
                       </div>
                       <code className="text-[10px] font-mono text-muted-foreground">{tool.name}</code>
                     </CardHeader>
                     <CardContent>
                       <p className="text-xs text-muted-foreground leading-relaxed">{tool.description}</p>
-                      <p className="mt-3 text-[10px] font-mono text-cyan-400/70">
-                        "What's in vitalik's Arbitrum wallet?" → works instantly
-                      </p>
+                      {examplePrompts[tool.name] && (
+                        <p className={`mt-3 text-[10px] font-mono ${styles.prompt}`}>
+                          {examplePrompts[tool.name]}
+                        </p>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -363,11 +404,6 @@ export default function Landing() {
                 </Card>
               );
             })}
-
-            <Card className="bg-primary/5 border-primary/20 hover:border-primary/40 transition-all flex flex-col justify-center items-center text-center p-6 gap-3">
-              <p className="text-xs text-muted-foreground">More tools coming</p>
-              <p className="text-[10px] font-mono text-primary/60">Aave positions · GMX perps · Uniswap LP</p>
-            </Card>
           </div>
 
           <div className="flex justify-center">

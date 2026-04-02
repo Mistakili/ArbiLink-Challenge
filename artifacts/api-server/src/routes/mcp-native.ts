@@ -6,6 +6,9 @@ import {
   fetchWalletPortfolio,
   fetchTransaction,
   fetchTopTokens,
+  simulateGmxOpen,
+  prepareUniswapSwap,
+  fetchGmxPositionHealth,
   ARBITRUM_PROTOCOLS,
   getPublicClient,
   ARBITRUM_SEPOLIA_EXPLORER,
@@ -127,6 +130,50 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           return textContent("Error: address parameter is required", true);
         }
         result = await fetchWalletPortfolio(address, network);
+        break;
+      }
+      case "simulate_gmx_open": {
+        const indexToken   = args["indexToken"];
+        const collateralUsd = args["collateralUsd"];
+        const leverage     = args["leverage"];
+        const direction    = args["direction"];
+        if (typeof indexToken !== "string") {
+          return textContent("Error: indexToken is required (e.g. ETH, BTC, ARB)", true);
+        }
+        if (typeof collateralUsd !== "number") {
+          return textContent("Error: collateralUsd must be a number (e.g. 500)", true);
+        }
+        if (typeof leverage !== "number") {
+          return textContent("Error: leverage must be a number (e.g. 10 for 10x)", true);
+        }
+        if (typeof direction !== "string") {
+          return textContent('Error: direction must be "long" or "short"', true);
+        }
+        result = await simulateGmxOpen({ indexToken, collateralUsd, leverage, direction: direction as "long" | "short" });
+        break;
+      }
+      case "prepare_uniswap_swap": {
+        const tokenIn  = args["tokenIn"];
+        const tokenOut = args["tokenOut"];
+        const amountIn = args["amountIn"];
+        const slippage = args["slippageTolerance"];
+        if (typeof tokenIn !== "string")  return textContent("Error: tokenIn is required (e.g. ETH, USDC)", true);
+        if (typeof tokenOut !== "string") return textContent("Error: tokenOut is required (e.g. USDC, ARB)", true);
+        if (typeof amountIn !== "number") return textContent("Error: amountIn must be a number (e.g. 1.5)", true);
+        result = await prepareUniswapSwap({
+          tokenIn,
+          tokenOut,
+          amountIn,
+          slippageTolerance: typeof slippage === "number" ? slippage : 0.5,
+        });
+        break;
+      }
+      case "get_gmx_position_health": {
+        const address = args["address"];
+        if (typeof address !== "string") {
+          return textContent("Error: address is required (0x...)", true);
+        }
+        result = await fetchGmxPositionHealth(address);
         break;
       }
       default:

@@ -516,6 +516,418 @@ export async function fetchWalletPortfolio(address: string, network: "mainnet" |
   };
 }
 
+// ─── GMX V2 simulation constants ───────────────────────────────────────────
+
+const GMX_OPEN_FEE_BPS = 5;          // 0.05% of position size
+const GMX_MAINTENANCE_MARGIN_BPS = 100; // 1% maintenance margin (triggers liquidation)
+const GMX_HOURLY_BORROW_RATE = 0.00005; // ~0.005%/hr estimate (varies with pool utilization)
+
+const GMX_MARKETS: Record<string, { maxLeverage: number; coingeckoId: string }> = {
+  ETH:  { maxLeverage: 100, coingeckoId: "ethereum" },
+  WETH: { maxLeverage: 100, coingeckoId: "ethereum" },
+  BTC:  { maxLeverage: 100, coingeckoId: "bitcoin"  },
+  WBTC: { maxLeverage: 100, coingeckoId: "bitcoin"  },
+  ARB:  { maxLeverage:  50, coingeckoId: "arbitrum" },
+  LINK: { maxLeverage:  50, coingeckoId: "chainlink" },
+};
+
+// ─── Uniswap constants ──────────────────────────────────────────────────────
+
+const UNISWAP_SWAP_ROUTER = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45";
+
+const STABLE_SYMBOLS = new Set(["USDC", "USDT", "DAI"]);
+
+// Rough on-chain liquidity depth estimates (USD) per token for price-impact math
+const LIQUIDITY_DEPTH: Record<string, number> = {
+  ETH:   5_000_000, WETH:  5_000_000,
+  USDC: 10_000_000, USDT: 10_000_000, DAI: 5_000_000,
+  ARB:   2_000_000, WBTC:  3_000_000,
+  GMX:     500_000, LINK:    500_000, PENDLE: 200_000, RDNT: 200_000,
+};
+
+// ─── simulate_gmx_open ──────────────────────────────────────────────────────
+
+export async function simulateGmxOpen({
+  indexToken,
+  collateralUsd,
+  leverage,
+  direction,
+}: {
+  indexToken: string;
+  collateralUsd: number;
+  leverage: number;
+  direction: "long" | "short";
+}) {
+  const sym = indexToken.toUpperCase().replace("WRAPPED ETHER", "ETH").replace("WRAPPED BITCOIN", "BTC");
+  const market = GMX_MARKETS[sym];
+
+  if (!market) {
+    throw new Error(
+      `Unsupported index token "${indexToken}". Supported: ${Object.keys(GMX_MARKETS).join(", ")}`
+    );
+  }
+  if (typeof collateralUsd !== "number" || collateralUsd < 10) {
+    throw new Error("Minimum collateral is $10 USD");
+  }
+  if (collateralUsd > 10_000_000) {
+    throw new Error("Collateral exceeds maximum of $10M for simulation");
+  }
+  if (typeof leverage !== "number" || leverage < 1.1 || leverage > market.maxLeverage) {
+    throw new Error(`Leverage must be between 1.1x and ${market.maxLeverage}x for ${sym}`);
+  }
+  const dir = direction?.toLowerCase();
+  if (dir !== "long" && dir !== "short") {
+    throw new Error('direction must be "long" or "short"');
+  }
+
+  // Fetch live price
+  let entryPrice = 0;
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${market.coingeckoId}&vs_currencies=usd`,
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (res.ok) {
+      const data = (await res.json()) as Record<string, { usd: number }>;
+      entryPrice = data[market.coingeckoId]?.usd ?? 0;
+    }
+  } catch { /* price stays 0 */ }
+
+  if (entryPrice <= 0) {
+    throw new Error(`Unable to fetch live ${sym} price — try again in a moment`);
+  }
+
+  const positionSize  = collateralUsd * leverage;
+  const openFee       = positionSize * (GMX_OPEN_FEE_BPS / 10_000);
+  const maintenanceUsd = positionSize * (GMX_MAINTENANCE_MARGIN_BPS / 10_000);
+  const netCollateral = collateralUsd - openFee;
+  const collateralRatio = Math.max(0, (netCollateral - maintenanceUsd) / positionSize);
+
+  const liqPrice =
+    dir === "long"
+      ? entryPrice * (1 - collateralRatio)
+      : entryPrice * (1 + collateralRatio);
+
+  const pctToLiq =
+    dir === "long"
+      ? ((entryPrice - liqPrice) / entryPrice) * 100
+      : ((liqPrice - entryPrice) / entryPrice) * 100;
+
+  const pnlScenarios = [-20, -10, -5, +5, +10, +20].map((pct) => {
+    const newPrice    = entryPrice * (1 + pct / 100);
+    const priceRatio  = dir === "long" ? (newPrice - entryPrice) / entryPrice : (entryPrice - newPrice) / entryPrice;
+    const pnlUsd      = positionSize * priceRatio;
+    const roiPct      = (pnlUsd / collateralUsd) * 100;
+    const isLiquidated =
+      dir === "long" ? newPrice <= liqPrice : newPrice >= liqPrice;
+    return {
+      priceChange: `${pct > 0 ? "+" : ""}${pct}%`,
+      price:       `$${newPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}`,
+      pnl:         isLiquidated ? "LIQUIDATED" : `${pnlUsd >= 0 ? "+" : ""}$${pnlUsd.toFixed(2)}`,
+      roi:         isLiquidated ? "−100%" : `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(1)}%`,
+      liquidated:  isLiquidated,
+    };
+  });
+
+  const risks: string[] = [];
+  if (leverage > 50) risks.push(`⚠️ EXTREME RISK: ${leverage}x leverage — ${(100 / leverage).toFixed(1)}% adverse move = liquidation`);
+  else if (leverage > 20) risks.push(`⚠️ HIGH RISK: ${leverage}x leverage — amplified losses on adverse moves`);
+  if (pctToLiq < 5)  risks.push(`🚨 CRITICAL: only ${pctToLiq.toFixed(1)}% price move until liquidation`);
+  if (pctToLiq < 10) risks.push(`⚡ Liquidation distance is tight — monitor position closely`);
+
+  return {
+    simulation: true,
+    disclaimer: "SIMULATION ONLY — no transaction submitted. Figures use live CoinGecko prices and GMX V2 fee schedule.",
+    market:          `${sym}/USD`,
+    direction:       dir.toUpperCase(),
+    entryPrice:      `$${entryPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}`,
+    collateralInput: `$${collateralUsd.toFixed(2)} USDC`,
+    leverage:        `${leverage}x`,
+    positionSize:    `$${positionSize.toLocaleString("en-US", { maximumFractionDigits: 2 })}`,
+    openingFee:      `$${openFee.toFixed(4)} (0.05% of size)`,
+    netCollateral:   `$${netCollateral.toFixed(2)}`,
+    liquidationPrice:`$${liqPrice.toLocaleString("en-US", { maximumFractionDigits: 2 })}`,
+    distanceToLiq:   `${pctToLiq.toFixed(2)}% price move`,
+    estimatedHourlyBorrowFee: `$${(positionSize * GMX_HOURLY_BORROW_RATE).toFixed(4)}/hr`,
+    pnlScenarios,
+    riskWarnings: risks,
+    nextSteps: {
+      step1: `Approve USDC on GMX V2 PositionRouter (${Math.ceil(collateralUsd)} USDC)`,
+      step2: `Call PositionRouter.createIncreasePosition() with the parameters above`,
+      step3: "Your agent or wallet must sign and broadcast the transaction",
+      gmxApp: `https://app.gmx.io/#/trade/?market=${sym}&direction=${dir}`,
+    },
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+// ─── prepare_uniswap_swap ──────────────────────────────────────────────────
+
+export async function prepareUniswapSwap({
+  tokenIn,
+  tokenOut,
+  amountIn,
+  slippageTolerance = 0.5,
+}: {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: number;
+  slippageTolerance?: number;
+}) {
+  if (typeof amountIn !== "number" || amountIn <= 0) throw new Error("amountIn must be a positive number");
+  if (amountIn > 1_000_000_000) throw new Error("amountIn is unreasonably large");
+  if (typeof slippageTolerance !== "number" || slippageTolerance < 0.01 || slippageTolerance > 50) {
+    throw new Error("slippageTolerance must be between 0.01% and 50%");
+  }
+
+  const symIn  = tokenIn?.toUpperCase();
+  const symOut = tokenOut?.toUpperCase();
+  if (!symIn)  throw new Error("tokenIn is required");
+  if (!symOut) throw new Error("tokenOut is required");
+  if (symIn === symOut) throw new Error("tokenIn and tokenOut must be different");
+
+  const ETH_ENTRY = {
+    symbol: "ETH", address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" as Address,
+    decimals: 18, coingeckoId: "ethereum", name: "Ethereum",
+  };
+
+  const resolveToken = (sym: string) =>
+    sym === "ETH" ? ETH_ENTRY : ARBITRUM_TOKENS.find((t) => t.symbol === sym);
+
+  const inToken  = resolveToken(symIn);
+  const outToken = resolveToken(symOut);
+
+  if (!inToken)  throw new Error(`Unknown token "${symIn}". Supported: ETH, ${ARBITRUM_TOKENS.map((t) => t.symbol).join(", ")}`);
+  if (!outToken) throw new Error(`Unknown token "${symOut}". Supported: ETH, ${ARBITRUM_TOKENS.map((t) => t.symbol).join(", ")}`);
+
+  // Fetch prices
+  const cgIds = [...new Set([inToken.coingeckoId, outToken.coingeckoId])].join(",");
+  let prices: Record<string, { usd: number; usd_24h_change?: number }> = {};
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${cgIds}&vs_currencies=usd&include_24hr_change=true`,
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (res.ok) prices = (await res.json()) as typeof prices;
+  } catch { /* keep empty */ }
+
+  const priceIn  = prices[inToken.coingeckoId]?.usd ?? 0;
+  const priceOut = prices[outToken.coingeckoId]?.usd ?? 0;
+
+  if (priceIn === 0)  throw new Error(`Unable to fetch live price for ${symIn} — try again in a moment`);
+  if (priceOut === 0) throw new Error(`Unable to fetch live price for ${symOut} — try again in a moment`);
+
+  const inputValueUsd = amountIn * priceIn;
+  const isStablePair  = STABLE_SYMBOLS.has(symIn) && STABLE_SYMBOLS.has(symOut);
+  const poolFeeDecimal = isStablePair ? 0.0001 : 0.003;  // 0.01% or 0.3%
+  const poolFeeBps     = isStablePair ? 100    : 3000;
+
+  const grossOutput = inputValueUsd / priceOut;
+  const afterFee    = grossOutput * (1 - poolFeeDecimal);
+
+  const depth       = LIQUIDITY_DEPTH[symIn] ?? 100_000;
+  const priceImpact = Math.min((inputValueUsd / depth) * 100, 50); // cap at 50%
+  const afterImpact = afterFee * (1 - priceImpact / 100);
+  const minOut      = afterImpact * (1 - slippageTolerance / 100);
+
+  const amountInRaw  = BigInt(Math.round(amountIn  * 10 ** inToken.decimals));
+  const minOutRaw    = BigInt(Math.round(minOut     * 10 ** outToken.decimals));
+
+  const warnings: string[] = [];
+  if (priceImpact > 5)  warnings.push(`⚠️ HIGH PRICE IMPACT (${priceImpact.toFixed(2)}%) — consider splitting into smaller trades`);
+  if (priceImpact > 15) warnings.push(`🚨 VERY HIGH IMPACT — this trade size will significantly move the price`);
+  if (inputValueUsd < 1) warnings.push("⚠️ Very small trade — gas cost (~$0.001) may exceed swap value");
+
+  return {
+    simulation: true,
+    disclaimer: "QUOTE ONLY — no transaction submitted. Figures are price-based estimates using live CoinGecko data.",
+    swap: {
+      tokenIn:  { symbol: symIn,  address: inToken.address,  decimals: inToken.decimals  },
+      tokenOut: { symbol: symOut, address: outToken.address, decimals: outToken.decimals },
+      amountIn:                `${amountIn} ${symIn}`,
+      amountInValueUsd:        `$${inputValueUsd.toFixed(4)}`,
+      estimatedAmountOut:      `${afterImpact.toFixed(6)} ${symOut}`,
+      estimatedAmountOutUsd:   `$${(afterImpact * priceOut).toFixed(4)}`,
+      minimumAmountOut:        `${minOut.toFixed(6)} ${symOut}`,
+      exchangeRate:            `1 ${symIn} = ${(priceIn / priceOut).toFixed(6)} ${symOut}`,
+    },
+    fees: {
+      poolFee:             `${poolFeeDecimal * 100}% (${poolFeeBps} bps, ${isStablePair ? "stable pool" : "standard pool"})`,
+      estimatedPriceImpact:`${priceImpact < 0.01 ? "<0.01" : priceImpact.toFixed(3)}%`,
+      estimatedGas:        "~130,000 gas (~$0.001 on Arbitrum)",
+    },
+    execution: {
+      router:   UNISWAP_SWAP_ROUTER,
+      method:   "exactInputSingle",
+      params: {
+        tokenIn:           inToken.address,
+        tokenOut:          outToken.address,
+        fee:               poolFeeBps,
+        recipient:         "<YOUR_WALLET_ADDRESS>",
+        amountIn:          amountInRaw.toString(),
+        amountOutMinimum:  minOutRaw.toString(),
+        sqrtPriceLimitX96: "0",
+      },
+      requiresApproval: symIn !== "ETH",
+      approvalTarget:   UNISWAP_SWAP_ROUTER,
+      approvalAmount:   amountInRaw.toString(),
+      uniswapApp: `https://app.uniswap.org/#/swap?inputCurrency=${inToken.address}&outputCurrency=${outToken.address}&exactAmount=${amountIn}&exactField=input&chain=arbitrum`,
+    },
+    priceWarnings: warnings,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+// GMX V2 market address → token symbol (Arbitrum mainnet)
+const GMX_MARKET_TOKENS: Record<string, string> = {
+  "0x70d95587d40A2caf56bd97485aB3Eec10Bee6336": "ETH",
+  "0x7f1fa204bb700853D36994DA19F830b6Ad18455C": "ETH",
+  "0x47c031236e19d024b42f8AE6780E44A573170703": "BTC",
+  "0x47E14b6f2e8A6e68aec6dCF46Da452dbf2b2ef56": "BTC",
+  "0xC25cEf6061Cf5dE5eb761b50E4743c1F5D7E5407": "ARB",
+  "0x0CCB4fAa6f1F1B0f5487E3c9ec307F4E71d0EC4a": "ARB",
+  "0x7f1fa204bb700853D36994DA19F830b6Ad18455C": "ETH",
+  "0xD9535bB5f58A1a75032416F2dFe7880C30575a41": "LINK",
+};
+
+// ─── get_gmx_position_health ──────────────────────────────────────────────
+
+export async function fetchGmxPositionHealth(address: string) {
+  if (!isAddress(address)) throw new Error("Invalid Ethereum address");
+
+  const addrLower = address.toLowerCase();
+
+  // Fetch current prices for context
+  let currentPrices: Record<string, number> = {};
+  try {
+    const res = await fetch(
+      "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,bitcoin,arbitrum,chainlink&vs_currencies=usd",
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (res.ok) {
+      const data = (await res.json()) as Record<string, { usd: number }>;
+      currentPrices = {
+        ETH:  data.ethereum?.usd  ?? 0,
+        BTC:  data.bitcoin?.usd   ?? 0,
+        ARB:  data.arbitrum?.usd  ?? 0,
+        LINK: data.chainlink?.usd ?? 0,
+      };
+    }
+  } catch { /* prices stay empty */ }
+
+  // Fetch positions from GMX API — returns global list, filter by account client-side
+  let allPositions: unknown[] = [];
+  let dataSource = "gmx-api";
+
+  try {
+    const res = await fetch(
+      `https://arbitrum-api.gmxinfra.io/positions?account=${address}`,
+      { signal: AbortSignal.timeout(10000), headers: { Accept: "application/json" } }
+    );
+    if (res.ok) {
+      const data = (await res.json()) as unknown;
+      const arr = Array.isArray(data) ? data : ((data as { positions?: unknown[] }).positions ?? []);
+      // Filter to only this address (API may return all positions)
+      allPositions = arr.filter((p: unknown) => {
+        const pos = p as Record<string, unknown>;
+        return (pos["account"] as string)?.toLowerCase() === addrLower;
+      });
+    } else {
+      dataSource = "unavailable";
+    }
+  } catch {
+    dataSource = "unavailable";
+  }
+
+  const priceDisplay = Object.entries(currentPrices)
+    .filter(([, v]) => v > 0)
+    .map(([sym, price]) => ({ symbol: sym, price: `$${price.toLocaleString()}` }));
+
+  if (allPositions.length === 0) {
+    return {
+      address,
+      network: "Arbitrum One",
+      openPositions: 0,
+      positions: [],
+      currentPrices: priceDisplay,
+      note:
+        dataSource === "unavailable"
+          ? "GMX position data temporarily unavailable. Check https://app.gmx.io/#/accounts/" + address
+          : `No open GMX V2 positions found for ${address}. The wallet may have no active perpetual trades.`,
+      gmxApp: `https://app.gmx.io/#/accounts/${address}`,
+      arbiscan: `https://arbiscan.io/address/${address}`,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
+  // Normalize positions using actual GMX V2 API schema
+  const positions = allPositions.map((p: unknown) => {
+    const pos = p as Record<string, unknown>;
+    const isLong = Boolean(pos["isLong"]);
+
+    // sizeInUsd and pnl are in 1e30 precision (GMX V2 standard)
+    const sizeRaw = BigInt(String(pos["sizeInUsd"] ?? "0"));
+    const pnlRaw  = BigInt(String(pos["pnl"] ?? "0"));
+    const PRECISION = BigInt("1000000000000000000000000000000"); // 1e30
+    const sizeUsd = Number(sizeRaw) / 1e30;
+    const pnlUsd  = Number(pnlRaw) / 1e30;
+
+    const marketAddr = ((pos["marketAddress"] as string) ?? "").toLowerCase();
+    const indexSym = Object.entries(GMX_MARKET_TOKENS).find(
+      ([k]) => k.toLowerCase() === marketAddr
+    )?.[1] ?? "UNKNOWN";
+
+    const livePrice = currentPrices[indexSym] ?? 0;
+
+    // Approximate collateral from pnl + size (GMX doesn't expose collateral directly in list view)
+    const approxCollateral = sizeUsd > 0 ? sizeUsd / 10 : 0; // rough 10x default estimate
+    const maintenanceUsd = sizeUsd * (GMX_MAINTENANCE_MARGIN_BPS / 10_000);
+    const collatForHealth = approxCollateral - maintenanceUsd;
+
+    // Estimate liq price directionally
+    const liqEstimate = sizeUsd > 0 && livePrice > 0
+      ? isLong
+        ? livePrice * (1 - collatForHealth / sizeUsd)
+        : livePrice * (1 + collatForHealth / sizeUsd)
+      : null;
+
+    const healthStatus =
+      liqEstimate && livePrice > 0
+        ? isLong
+          ? livePrice < liqEstimate * 1.05 ? "🚨 CRITICAL"
+          : livePrice < liqEstimate * 1.15  ? "⚠️ AT RISK"
+          : "✅ HEALTHY"
+        : livePrice > liqEstimate * 0.95    ? "🚨 CRITICAL"
+          : livePrice > liqEstimate * 0.85  ? "⚠️ AT RISK"
+          : "✅ HEALTHY"
+        : "ACTIVE";
+
+    return {
+      market:           indexSym !== "UNKNOWN" ? `${indexSym}/USD` : `${marketAddr.slice(0, 8)}…/USD`,
+      direction:        isLong ? "LONG" : "SHORT",
+      sizeUsd:          sizeUsd  > 0 ? `$${sizeUsd.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "N/A",
+      unrealizedPnl:    `${pnlUsd >= 0 ? "+" : ""}$${pnlUsd.toFixed(2)}`,
+      currentPrice:     livePrice > 0 ? `$${livePrice.toLocaleString()}` : "N/A",
+      liquidationEst:   liqEstimate ? `~$${liqEstimate.toLocaleString("en-US", { maximumFractionDigits: 2 })} (est.)` : "N/A",
+      healthStatus,
+      positionKey:      pos["key"] as string,
+      collateralToken:  pos["collateralToken"] as string,
+    };
+  });
+
+  return {
+    address,
+    network: "Arbitrum One",
+    openPositions: positions.length,
+    positions,
+    currentPrices: priceDisplay,
+    note: "Liquidation prices are estimates based on ~10x leverage assumption. Use the GMX app for exact figures.",
+    gmxApp:    `https://app.gmx.io/#/accounts/${address}`,
+    arbiscan:  `https://arbiscan.io/address/${address}`,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
 export async function fetchTopTokens() {
   let prices: Record<string, { usd: number; usd_24h_change: number; usd_24h_vol: number }> = {};
   try {
