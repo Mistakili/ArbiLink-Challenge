@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ArbiLink - Arbitrum MCP Server API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: arbitrum
+    description: Arbitrum blockchain operations
+  - name: agent
+    description: Agent identity and registration
+  - name: mcp
+    description: Model Context Protocol tools
 paths:
   /healthz:
     get:
@@ -24,6 +30,204 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /arbitrum/network:
+    get:
+      operationId: getNetworkStatus
+      tags: [arbitrum]
+      summary: Get Arbitrum network status
+      description: Returns current block, gas price, and network info for Arbitrum
+      responses:
+        "200":
+          description: Network status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkStatus"
+
+  /arbitrum/balance/{address}:
+    get:
+      operationId: getBalance
+      tags: [arbitrum]
+      summary: Get wallet balance
+      description: Returns ETH balance and top ERC-20 token balances for an address on Arbitrum
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Ethereum address (0x...)
+      responses:
+        "200":
+          description: Wallet balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletBalance"
+        "400":
+          description: Invalid address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /arbitrum/tx/{hash}:
+    get:
+      operationId: getTransaction
+      tags: [arbitrum]
+      summary: Get transaction details
+      description: Returns detailed information about a transaction on Arbitrum
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction hash (0x...)
+      responses:
+        "200":
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionInfo"
+        "404":
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /arbitrum/tokens:
+    get:
+      operationId: getTopTokens
+      tags: [arbitrum]
+      summary: Get top Arbitrum tokens
+      description: Returns top tokens on Arbitrum with prices from Uniswap/Chainlink
+      responses:
+        "200":
+          description: Token list with prices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenList"
+
+  /arbitrum/protocols:
+    get:
+      operationId: getProtocols
+      tags: [arbitrum]
+      summary: Get Arbitrum ecosystem protocols
+      description: Returns list of major protocols on Arbitrum with metadata
+      responses:
+        "200":
+          description: Protocol list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProtocolList"
+
+  /agent/register:
+    post:
+      operationId: registerAgent
+      tags: [agent]
+      summary: Register agent on Arbitrum identity registry
+      description: Registers an AI agent on the official Arbitrum agent identity registry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterAgentRequest"
+      responses:
+        "200":
+          description: Agent registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterAgentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /agent/status/{address}:
+    get:
+      operationId: getAgentStatus
+      tags: [agent]
+      summary: Get agent registration status
+      description: Check if an agent is registered on the Arbitrum identity registry
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent wallet address
+      responses:
+        "200":
+          description: Agent status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentStatus"
+
+  /mcp/tools:
+    get:
+      operationId: getMcpTools
+      tags: [mcp]
+      summary: List all MCP tools
+      description: Returns OpenAI-compatible tool definitions for all Arbitrum MCP capabilities
+      responses:
+        "200":
+          description: MCP tool definitions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpToolList"
+
+  /mcp/execute:
+    post:
+      operationId: executeMcpTool
+      tags: [mcp]
+      summary: Execute an MCP tool
+      description: Execute an Arbitrum tool call in OpenAI function-calling format
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpExecuteRequest"
+      responses:
+        "200":
+          description: Tool execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpExecuteResponse"
+        "400":
+          description: Invalid tool or arguments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats/overview:
+    get:
+      operationId: getOverviewStats
+      tags: [arbitrum]
+      summary: Get Arbitrum overview stats
+      description: Returns aggregated stats - total transactions, active wallets, gas usage, uptime
+      responses:
+        "200":
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +238,394 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message
+
+    NetworkStatus:
+      type: object
+      properties:
+        chainId:
+          type: number
+        network:
+          type: string
+        blockNumber:
+          type: number
+        gasPrice:
+          type: string
+        gasPriceGwei:
+          type: string
+        isMainnet:
+          type: boolean
+        rpcUrl:
+          type: string
+        explorerUrl:
+          type: string
+        status:
+          type: string
+      required:
+        - chainId
+        - network
+        - blockNumber
+        - gasPrice
+        - gasPriceGwei
+        - isMainnet
+        - rpcUrl
+        - explorerUrl
+        - status
+
+    TokenBalance:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        balance:
+          type: string
+        decimals:
+          type: number
+        usdValue:
+          type: string
+          nullable: true
+      required:
+        - symbol
+        - name
+        - address
+        - balance
+        - decimals
+
+    WalletBalance:
+      type: object
+      properties:
+        address:
+          type: string
+        ethBalance:
+          type: string
+        ethBalanceFormatted:
+          type: string
+        usdValue:
+          type: string
+          nullable: true
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/TokenBalance"
+        network:
+          type: string
+        explorerUrl:
+          type: string
+      required:
+        - address
+        - ethBalance
+        - ethBalanceFormatted
+        - tokens
+        - network
+        - explorerUrl
+
+    TransactionInfo:
+      type: object
+      properties:
+        hash:
+          type: string
+        blockNumber:
+          type: number
+          nullable: true
+        from:
+          type: string
+        to:
+          type: string
+          nullable: true
+        value:
+          type: string
+        valueFormatted:
+          type: string
+        gasPrice:
+          type: string
+        gasUsed:
+          type: string
+          nullable: true
+        status:
+          type: string
+        timestamp:
+          type: number
+          nullable: true
+        explorerUrl:
+          type: string
+        network:
+          type: string
+      required:
+        - hash
+        - from
+        - value
+        - valueFormatted
+        - gasPrice
+        - status
+        - explorerUrl
+        - network
+
+    TokenInfo:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        price:
+          type: string
+        priceChange24h:
+          type: string
+        volume24h:
+          type: string
+          nullable: true
+        decimals:
+          type: number
+        logoUrl:
+          type: string
+          nullable: true
+      required:
+        - symbol
+        - name
+        - address
+        - price
+        - priceChange24h
+        - decimals
+
+    TokenList:
+      type: object
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/TokenInfo"
+        network:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - tokens
+        - network
+        - updatedAt
+
+    ProtocolInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        website:
+          type: string
+        tvl:
+          type: string
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+        contractAddress:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+      required:
+        - name
+        - category
+        - description
+        - website
+        - isActive
+
+    ProtocolList:
+      type: object
+      properties:
+        protocols:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProtocolInfo"
+        network:
+          type: string
+      required:
+        - protocols
+        - network
+
+    RegisterAgentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Agent name
+        description:
+          type: string
+          description: Agent description
+        privateKey:
+          type: string
+          description: Private key of the wallet to use for registration (handled server-side, never stored)
+        network:
+          type: string
+          enum: [mainnet, sepolia]
+          description: Which Arbitrum network to register on
+        metadataUri:
+          type: string
+          nullable: true
+          description: Optional URI pointing to agent metadata
+      required:
+        - name
+        - description
+        - privateKey
+        - network
+
+    RegisterAgentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        transactionHash:
+          type: string
+          nullable: true
+        agentAddress:
+          type: string
+        registryAddress:
+          type: string
+        network:
+          type: string
+        explorerUrl:
+          type: string
+          nullable: true
+        message:
+          type: string
+      required:
+        - success
+        - agentAddress
+        - registryAddress
+        - network
+        - message
+
+    AgentStatus:
+      type: object
+      properties:
+        address:
+          type: string
+        isRegistered:
+          type: boolean
+        registryAddress:
+          type: string
+        network:
+          type: string
+        registrationBlock:
+          type: number
+          nullable: true
+        explorerUrl:
+          type: string
+      required:
+        - address
+        - isRegistered
+        - registryAddress
+        - network
+        - explorerUrl
+
+    McpTool:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+        - description
+        - inputSchema
+
+    McpToolList:
+      type: object
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/McpTool"
+        version:
+          type: string
+        description:
+          type: string
+      required:
+        - tools
+        - version
+        - description
+
+    McpExecuteRequest:
+      type: object
+      properties:
+        tool:
+          type: string
+          description: Tool name to execute
+        arguments:
+          type: object
+          additionalProperties: true
+          description: Tool arguments
+      required:
+        - tool
+        - arguments
+
+    McpExecuteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        result:
+          type: object
+          additionalProperties: true
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        tool:
+          type: string
+        executedAt:
+          type: string
+      required:
+        - success
+        - tool
+        - executedAt
+
+    OverviewStats:
+      type: object
+      properties:
+        network:
+          type: string
+        blockNumber:
+          type: number
+        totalToolCalls:
+          type: number
+        activeAgents:
+          type: number
+        supportedProtocols:
+          type: number
+        availableTools:
+          type: number
+        avgGasPrice:
+          type: string
+        uptimePercent:
+          type: string
+      required:
+        - network
+        - blockNumber
+        - totalToolCalls
+        - activeAgents
+        - supportedProtocols
+        - availableTools
+        - avgGasPrice
+        - uptimePercent
