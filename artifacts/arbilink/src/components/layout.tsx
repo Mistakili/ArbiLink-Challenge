@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Hexagon, Activity, Wrench, Search, LayoutGrid, Cpu } from "lucide-react";
+import { Hexagon, Home, Activity, Wrench, Search, LayoutGrid, Cpu } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useGetNetworkStatus } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,7 +9,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { data: networkStatus, isLoading } = useGetNetworkStatus();
 
   const navItems = [
-    { href: "/", label: "Dashboard", icon: Activity },
+    { href: "/", label: "Home", icon: Home },
+    { href: "/dashboard", label: "Dashboard", icon: Activity },
     { href: "/tools", label: "MCP Tools", icon: Wrench },
     { href: "/explorer", label: "Explorer", icon: Search },
     { href: "/protocols", label: "Protocols", icon: LayoutGrid },

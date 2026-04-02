@@ -1,11 +1,11 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/sonner"; // changed to sonner per component usage
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 
-// Pages
+import Landing from "@/pages/landing";
 import Home from "@/pages/home";
 import Tools from "@/pages/tools";
 import Explorer from "@/pages/explorer";
@@ -25,7 +25,8 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={Landing} />
+        <Route path="/dashboard" component={Home} />
         <Route path="/tools" component={Tools} />
         <Route path="/explorer" component={Explorer} />
         <Route path="/protocols" component={Protocols} />
