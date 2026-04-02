@@ -3,6 +3,7 @@ import { MCP_TOOLS } from "../lib/mcp-tools.js";
 import {
   fetchNetworkStatus,
   fetchWalletBalance,
+  fetchWalletPortfolio,
   fetchTransaction,
   fetchTopTokens,
   ARBITRUM_PROTOCOLS,
@@ -118,6 +119,14 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           avgGasPrice: networkData.gasPriceGwei + " gwei",
           uptimePercent: "99.9",
         };
+        break;
+      }
+      case "get_wallet_portfolio": {
+        const address = args["address"];
+        if (typeof address !== "string") {
+          return textContent("Error: address parameter is required", true);
+        }
+        result = await fetchWalletPortfolio(address, network);
         break;
       }
       default:

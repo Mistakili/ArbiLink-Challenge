@@ -105,4 +105,24 @@ export const MCP_TOOLS = [
       required: [],
     },
   },
+  {
+    name: "get_wallet_portfolio",
+    description:
+      "Get the complete Arbitrum portfolio for any wallet address. Returns total USD value, all ETH and ERC-20 token holdings (ARB, WETH, USDC, USDT, WBTC, GMX, LINK, DAI, PENDLE, RDNT) with live prices, 24h change, and each holding's percentage of the total portfolio. Use this when someone asks 'what's in this wallet?', 'show me the portfolio of 0x...', or 'how much crypto does this address hold?'",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: {
+          type: "string",
+          description: "Ethereum wallet address starting with 0x",
+        },
+        network: {
+          type: "string",
+          enum: ["mainnet", "sepolia"],
+          description: "Which Arbitrum network to query (default: mainnet)",
+        },
+      },
+      required: ["address"],
+    },
+  },
 ];

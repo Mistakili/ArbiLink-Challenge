@@ -152,6 +152,30 @@ export const ARBITRUM_TOKENS: Array<{
     logoUrl: "https://assets.coingecko.com/coins/images/7598/small/wrapped_bitcoin_wbtc.png",
     coingeckoId: "wrapped-bitcoin",
   },
+  {
+    symbol: "DAI",
+    name: "Dai Stablecoin",
+    address: "0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1",
+    decimals: 18,
+    logoUrl: "https://assets.coingecko.com/coins/images/9956/small/Badge_Dai.png",
+    coingeckoId: "dai",
+  },
+  {
+    symbol: "PENDLE",
+    name: "Pendle",
+    address: "0x0c880f6761F1af8d9Aa9C466984b80DAb9a8c9e8",
+    decimals: 18,
+    logoUrl: "https://assets.coingecko.com/coins/images/15069/small/Pendle_Logo_Normal-03.png",
+    coingeckoId: "pendle",
+  },
+  {
+    symbol: "RDNT",
+    name: "Radiant Capital",
+    address: "0x3082CC23568eA640225c2467653dB90e9250AaA0",
+    decimals: 18,
+    logoUrl: "https://assets.coingecko.com/coins/images/26536/small/Radiant-Logo-200x200.png",
+    coingeckoId: "radiant-capital",
+  },
 ];
 
 export const ARBITRUM_PROTOCOLS = [
@@ -376,6 +400,119 @@ export async function fetchTransaction(hash: string, network: "mainnet" | "sepol
     timestamp,
     explorerUrl: `${explorer}/tx/${hash}`,
     network: isMainnet ? "Arbitrum One" : "Arbitrum Sepolia",
+  };
+}
+
+export async function fetchWalletPortfolio(address: string, network: "mainnet" | "sepolia" = "mainnet") {
+  if (!isAddress(address)) throw new Error("Invalid Ethereum address");
+
+  const client = getPublicClient(network);
+  const isMainnet = network === "mainnet";
+  const explorer = isMainnet ? ARBITRUM_EXPLORER : ARBITRUM_SEPOLIA_EXPLORER;
+  const addr = address as Address;
+
+  const coingeckoIds = ["ethereum", ...ARBITRUM_TOKENS.map((t) => t.coingeckoId)].join(",");
+  let prices: Record<string, { usd: number; usd_24h_change?: number }> = {};
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${coingeckoIds}&vs_currencies=usd&include_24hr_change=true`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (res.ok) prices = (await res.json()) as typeof prices;
+  } catch { /* use empty prices */ }
+
+  const ethBalance = await client.getBalance({ address: addr });
+  const ethFormatted = parseFloat(formatEther(ethBalance));
+  const ethPrice = prices["ethereum"]?.usd ?? 0;
+  const ethUsd = ethFormatted * ethPrice;
+
+  const holdings: Array<{
+    symbol: string;
+    name: string;
+    address: string;
+    logoUrl: string;
+    balance: string;
+    balanceFormatted: number;
+    priceUsd: number;
+    valueUsd: number;
+    change24h: number | null;
+    type: "native" | "erc20";
+  }> = [];
+
+  if (ethFormatted > 0 || true) {
+    holdings.push({
+      symbol: "ETH",
+      name: "Ethereum",
+      address: "native",
+      logoUrl: "https://assets.coingecko.com/coins/images/279/small/ethereum.png",
+      balance: ethBalance.toString(),
+      balanceFormatted: ethFormatted,
+      priceUsd: ethPrice,
+      valueUsd: ethUsd,
+      change24h: prices["ethereum"]?.usd_24h_change ?? null,
+      type: "native",
+    });
+  }
+
+  if (isMainnet) {
+    const tokenBalances = await Promise.allSettled(
+      ARBITRUM_TOKENS.map(async (token) => {
+        const raw = await client.readContract({
+          address: token.address,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [addr],
+        });
+        const formatted = parseFloat(formatUnits(raw, token.decimals));
+        const price = prices[token.coingeckoId]?.usd ?? 0;
+        const valueUsd = formatted * price;
+        return { token, raw, formatted, price, valueUsd };
+      })
+    );
+
+    for (const result of tokenBalances) {
+      if (result.status === "fulfilled" && result.value.formatted > 0) {
+        const { token, raw, formatted, price, valueUsd } = result.value;
+        holdings.push({
+          symbol: token.symbol,
+          name: token.name,
+          address: token.address,
+          logoUrl: token.logoUrl,
+          balance: raw.toString(),
+          balanceFormatted: formatted,
+          priceUsd: price,
+          valueUsd,
+          change24h: prices[token.coingeckoId]?.usd_24h_change ?? null,
+          type: "erc20",
+        });
+      }
+    }
+  }
+
+  holdings.sort((a, b) => b.valueUsd - a.valueUsd);
+
+  const totalUsd = holdings.reduce((sum, h) => sum + h.valueUsd, 0);
+  const nonZeroHoldings = holdings.filter((h) => h.balanceFormatted > 0);
+
+  return {
+    address,
+    network: isMainnet ? "Arbitrum One" : "Arbitrum Sepolia",
+    explorerUrl: `${explorer}/address/${address}`,
+    totalValueUsd: totalUsd > 0 ? `$${totalUsd.toFixed(2)}` : "Unknown (no price data)",
+    totalValueRaw: totalUsd,
+    holdingsCount: nonZeroHoldings.length,
+    holdings: nonZeroHoldings.map((h) => ({
+      symbol: h.symbol,
+      name: h.name,
+      address: h.address,
+      logoUrl: h.logoUrl,
+      balance: h.balanceFormatted < 0.000001 ? h.balance : h.balanceFormatted.toFixed(6),
+      priceUsd: h.priceUsd > 0 ? `$${h.priceUsd.toFixed(4)}` : "N/A",
+      valueUsd: h.valueUsd > 0 ? `$${h.valueUsd.toFixed(2)}` : "< $0.01",
+      change24h: h.change24h !== null ? `${h.change24h.toFixed(2)}%` : "N/A",
+      portfolioPercent: totalUsd > 0 ? `${((h.valueUsd / totalUsd) * 100).toFixed(1)}%` : "N/A",
+    })),
+    fetchedAt: new Date().toISOString(),
   };
 }
 

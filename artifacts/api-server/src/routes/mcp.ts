@@ -8,6 +8,7 @@ import { MCP_TOOLS } from "../lib/mcp-tools.js";
 import {
   fetchNetworkStatus,
   fetchWalletBalance,
+  fetchWalletPortfolio,
   fetchTransaction,
   fetchTopTokens,
   ARBITRUM_PROTOCOLS,
@@ -135,6 +136,15 @@ router.post("/mcp/execute", async (req, res) => {
           avgGasPrice: networkData.gasPriceGwei + " gwei",
           uptimePercent: "99.9",
         };
+        break;
+      }
+      case "get_wallet_portfolio": {
+        const address = args?.["address"];
+        if (typeof address !== "string") {
+          res.status(400).json({ error: "missing_arg", message: "address is required" });
+          return;
+        }
+        result = await fetchWalletPortfolio(address, network);
         break;
       }
       default:

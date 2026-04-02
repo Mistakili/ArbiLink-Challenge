@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Bot,
   BarChart3,
+  PieChart,
   CheckCircle2,
   Copy,
   Check,
@@ -20,18 +21,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const TOOLS = [
   {
+    icon: PieChart,
+    name: "get_wallet_portfolio",
+    label: "Wallet Portfolio",
+    description: "Complete portfolio breakdown for any address — total USD value, all token holdings with live prices, 24h change, and % allocation. Ask Claude what's in any wallet.",
+    color: "text-cyan-400",
+    highlight: true,
+  },
+  {
     icon: Blocks,
     name: "get_network_status",
     label: "Network Status",
     description: "Live block number, gas price, chain ID, and RPC health for Arbitrum One or Sepolia.",
     color: "text-primary",
+    highlight: false,
   },
   {
     icon: Wallet,
     name: "get_wallet_balance",
     label: "Wallet Balance",
-    description: "Query ETH balance for any address on Arbitrum mainnet or testnet.",
+    description: "Quick ETH balance lookup for any address on Arbitrum mainnet or testnet.",
     color: "text-blue-400",
+    highlight: false,
   },
   {
     icon: Hash,
@@ -39,6 +50,7 @@ const TOOLS = [
     label: "Transaction Lookup",
     description: "Inspect any tx hash — status, value, gas used, block confirmation.",
     color: "text-violet-400",
+    highlight: false,
   },
   {
     icon: Coins,
@@ -46,6 +58,7 @@ const TOOLS = [
     label: "Token Prices",
     description: "Live prices for ARB, WETH, USDC, USDT, and more from CoinGecko.",
     color: "text-yellow-400",
+    highlight: false,
   },
   {
     icon: LayoutGrid,
@@ -53,13 +66,15 @@ const TOOLS = [
     label: "DeFi Protocols",
     description: "Discover the full Arbitrum DeFi ecosystem — Uniswap, Aave, GMX, and 20+ more.",
     color: "text-green-400",
+    highlight: false,
   },
   {
     icon: Bot,
     name: "get_agent_status",
     label: "Agent Identity",
-    description: "Check if an Ethereum address is registered in the on-chain ArbiLink agent registry.",
+    description: "Check if an address is registered in the on-chain ArbiLink agent registry.",
     color: "text-orange-400",
+    highlight: false,
   },
   {
     icon: BarChart3,
@@ -67,6 +82,7 @@ const TOOLS = [
     label: "Overview Stats",
     description: "Aggregate metrics: total tool calls, active agents, supported protocols.",
     color: "text-pink-400",
+    highlight: false,
   },
 ];
 
@@ -292,7 +308,7 @@ export default function Landing() {
         <div className="container max-w-screen-xl px-4 sm:px-8 py-24 space-y-12">
           <div className="space-y-2 text-center">
             <p className="text-xs font-mono text-primary uppercase tracking-widest">Tools</p>
-            <h2 className="text-3xl font-bold tracking-tight">7 live tools, ready now</h2>
+            <h2 className="text-3xl font-bold tracking-tight">8 live tools, ready now</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
               Every tool is callable from any MCP host or OpenAI-compatible agent framework.
               All data is fetched live from Arbitrum nodes — no cache, no stale data.
@@ -302,6 +318,33 @@ export default function Landing() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {TOOLS.map((tool) => {
               const Icon = tool.icon;
+              if (tool.highlight) {
+                return (
+                  <Card
+                    key={tool.name}
+                    className="sm:col-span-2 bg-cyan-950/30 border-cyan-500/30 hover:border-cyan-400/50 hover:bg-cyan-950/50 transition-all shadow-[0_0_30px_rgba(34,211,238,0.07)]"
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <Icon className={`h-4 w-4 ${tool.color}`} />
+                          {tool.label}
+                        </CardTitle>
+                        <Badge variant="outline" className="text-[9px] font-mono border-cyan-500/40 text-cyan-400 px-1.5">
+                          NEW
+                        </Badge>
+                      </div>
+                      <code className="text-[10px] font-mono text-muted-foreground">{tool.name}</code>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{tool.description}</p>
+                      <p className="mt-3 text-[10px] font-mono text-cyan-400/70">
+                        "What's in vitalik's Arbitrum wallet?" → works instantly
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              }
               return (
                 <Card
                   key={tool.name}
@@ -323,7 +366,7 @@ export default function Landing() {
 
             <Card className="bg-primary/5 border-primary/20 hover:border-primary/40 transition-all flex flex-col justify-center items-center text-center p-6 gap-3">
               <p className="text-xs text-muted-foreground">More tools coming</p>
-              <p className="text-[10px] font-mono text-primary/60">Aave · GMX · Uniswap · Chainlink</p>
+              <p className="text-[10px] font-mono text-primary/60">Aave positions · GMX perps · Uniswap LP</p>
             </Card>
           </div>
 
