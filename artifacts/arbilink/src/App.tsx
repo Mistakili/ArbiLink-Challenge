@@ -11,6 +11,7 @@ import Tools from "@/pages/tools";
 import Explorer from "@/pages/explorer";
 import Protocols from "@/pages/protocols";
 import Agent from "@/pages/agent";
+import Roadmap from "@/pages/roadmap";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +32,7 @@ function Router() {
         <Route path="/explorer" component={Explorer} />
         <Route path="/protocols" component={Protocols} />
         <Route path="/agent" component={Agent} />
+        <Route path="/roadmap" component={Roadmap} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Hexagon, Home, Activity, Wrench, Search, LayoutGrid, Cpu } from "lucide-react";
+import { Hexagon, Home, Activity, Wrench, Search, LayoutGrid, Cpu, Map } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useGetNetworkStatus } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/explorer", label: "Explorer", icon: Search },
     { href: "/protocols", label: "Protocols", icon: LayoutGrid },
     { href: "/agent", label: "Agent", icon: Cpu },
+    { href: "/roadmap", label: "Roadmap", icon: Map },
   ];
 
   return (
