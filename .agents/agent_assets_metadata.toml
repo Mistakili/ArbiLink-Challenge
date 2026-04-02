@@ -1,5 +1,16 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "2Imu8end7HoApY0bocRpt"
+uri = "file://artifacts/arbilink/public/hero-agent.png"
+type = "image"
+title = "hero agent blockchain"
+
+[[generated]]
+id = "RcLmT079ESpCqlefJY2M7"
+uri = "file://artifacts/arbilink/public/agent-eye.png"
+type = "image"
+title = "ai eye blockchain"
 
 [[outputs]]
 id = "hjrvB0nHuZxKi5YUn_bO_"
