@@ -1,0 +1,152 @@
+# ArbiLink Challenge - Agentic Bounty
+
+# Solve the challenge. Win $250 and a trip to London
+
+Build a use case that enables AI agents to interact with Arbitrum. This can be a **skill**, a **framework extension**, or a **full agentic workflow. R**egister your agent on the identity registry, and submit your work. Qualifying submissions are entered into a drawing to win a fully funded trip to the next Arbitrum Open House.
+
+<aside>
+💡
+
+### Haven’t applied for the Arbitrum Open House London yet? Find out how we support early-stage founders & builders and [**apply now.**](https://luma.com/openhouse-london?utm_source=ethcc_cannes&utm_medium=event&utm_campaign=oh-london-founder-house&utm_content=luma-registration)
+
+</aside>
+
+## Rewards
+
+---
+
+| Reward | Who Gets It |
+| --- | --- |
+| 💰 **$250 USDC** | Awarded to the **top 3 submissions** |
+| ✈️ **Trip to London** | All qualifying submissions are entered into a drawing for a fully funded trip to Arbitrum Open House London |
+
+## What We’re Looking For
+
+---
+
+Build a **skill, framework extension,** or a **full agentic workflow** that enables an AI agent to interact with Arbitrum. This includes things like:
+
+- Deploying smart contracts on Arbitrum
+- Integrating wallets (EOA, smart wallets, session keys)
+- Bridging assets across chains
+- Reading on-chain data (prices, balances, events)
+- Interacting with Arbitrum ecosystem protocols (Uniswap, GMX, Camelot, Fhenix, etc.)
+- Running or connecting to Arbitrum nodes
+
+**Bonus points for:**
+
+- ⭐ Original skills not seen before in the ecosystem
+- ⭐ Skills that integrate a specific Arbitrum ecosystem project
+
+## The Challenge
+
+---
+
+<aside>
+💡
+
+By participating in the challenge, you agree to the [terms and conditions](https://www.notion.so/33390457c326801f89a8d81c27b95555?pvs=21).
+
+</aside>
+
+Build something that connects AI agents to Arbitrum. This can be a **skill**, a **framework extension**, or a **full agentic workflow,** what matters is that it brings agent capabilities to Arbitrum in a meaningful way. Your agent must be registered on the Arbitrum identity registry
+(Arbitrum One or Sepolia).
+
+- **Submission Deadline**: April 3, 2026, 19:30 CET
+
+## Step-by-Step Instructions
+
+---
+
+Build a **skill** that enables an AI agent to interact with Arbitrum. This includes:
+
+### **Step 1: Build Your Skill (Mandatory)**
+
+Create a skill that enables an AI agent to interact with Arbitrum. Your skill 
+should be a well-structured, documented, and working implementation.
+
+<aside>
+💡
+
+Not sure how to start? Check out this example skill implementation for reference on structure, documentation, and code quality.
+
+[🔗 arbitrum-dapp-skill by @hummusonrails](https://github.com/hummusonrails/arbitrum-dapp-skill/blob/main/SKILL.md)
+
+> Use it as inspiration, not a template to copy. Original skills score higher. ⭐
+> 
+</aside>
+
+### **Step 2: Register Your Agent (Mandatory)**
+
+Register your agent on the Arbitrum identity registry using the official agent0 SDK, the Arbitrum-specific implementation, or your own approach.
+
+Arbitrum One registry: [`0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`](https://arbiscan.io/address/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432)
+Arbitrum Sepolia registry: [`0x8004A818BFB912233c491871b3d84c89A494BD9e`](https://sepolia.arbiscan.io/address/0x8004A818BFB912233c491871b3d84c89A494BD9e) 
+
+### **Step 3: Deploy & Go Agentic (Bonus)**
+
+Take your submission further by deploying a live, interactive agent, and this is where you can get creative with the stack.
+
+This can be:
+
+- A deployed agent with a public HTTP endpoint
+- A **Pi.dev** agent extension
+- An **OpenClaw** plugin or workflow
+- Any other agent framework integration that runs on or connects to Arbitrum
+
+Your implementation should be publicly accessible and include a link to your own repository with documentation.
+
+This step is **optional but recommended;** submissions with a live implementation will get additional points for the top 3 prizes.
+
+### Step 4: **Submit (Mandatory)**
+
+1. Fill the submission form:  [ArbiLink Agentic Bounty](https://www.notion.so/33390457c3268053ac0ac5c904c13a3e?pvs=21) 
+
+## After You Finish
+
+---
+
+1. Share your submission on socials, building in public is always the way to go. Tag us so we can amplify your work.
+2. Come show it to us at the Arbitrum booth in the hack space.
+
+## Additional Resources
+
+---
+
+- Need testnet ETH? Get it from a **Faucet**:
+    
+    You can go to one of these faucets, claim your Sepolia Eth (SepETH). Then bridge it from Ethereum Sepolia to Arbitrum Sepolia using the official Arbitrum bridge: https://bridge.arbitrum.io/.
+    
+    **Sepolia**
+    
+    - https://sepoliafaucet.com/
+    - https://arbitrum.faucet.dev/
+    - https://www.infura.io/faucet/sepolia
+    
+    Or you can claim ETH Sepolia directly to Arbitrum Sepolia.
+    
+    **Sepolia and Arbitrum Sepolia**
+    
+    - https://arbitrum.faucet.dev/
+    - https://faucet.quicknode.com/arbitrum/sepolia
+    - https://www.l2faucet.com/arbitrum
+- **Don't have Arbitrum Sepolia in your wallet?**
+    
+    The easiest way to add it:
+    1. Go to [chainlist.org](https://chainlist.org)
+    2. Search "Arbitrum Sepolia"
+    3. Click "Add to MetaMask"
+    4. Approve the network addition in your wallet
+    
+
+Arbitrum-specific doubts? Try our AI Assistant https://docs.arbitrum.io/
+
+Or speak to our team onsite who can help you.
+
+## About Open House
+
+---
+
+Open House is Arbitrum's global, end-to-end founder enablement program that activates developers and founders through a structured hybrid model of online and in-person experiences. Learn more and apply at [Arbitrum Open House — London · Luma](https://luma.com/openhouse-london).
+
+---
