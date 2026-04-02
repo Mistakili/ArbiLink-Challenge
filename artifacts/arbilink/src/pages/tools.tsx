@@ -23,12 +23,12 @@ export default function Tools() {
   const handleExecute = async () => {
     if (!selectedTool) return;
     
-    // Parse arguments based on schema types (simple heuristic)
+    // Parse arguments — keep addresses/hex strings as strings, only coerce plain decimals
     const parsedArgs: Record<string, any> = {};
     Object.entries(toolArgs).forEach(([k, v]) => {
       if (v === 'true') parsedArgs[k] = true;
       else if (v === 'false') parsedArgs[k] = false;
-      else if (!isNaN(Number(v)) && v !== '') parsedArgs[k] = Number(v);
+      else if (/^\d+(\.\d+)?$/.test(v)) parsedArgs[k] = Number(v);
       else parsedArgs[k] = v;
     });
 
